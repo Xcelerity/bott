@@ -1870,8 +1870,6 @@ client.on('messageCreate', async message => {
             await executePlayerMove(targetMember, null, 'loud');
 
             const deadPlayersCategory = guild.channels.cache.find(c => c.name === '💀 DEAD PLAYERS' && c.type === ChannelType.GuildCategory);
-            const publicChannelsCategory = guild.channels.cache.find(c => c.name === 'PUBLIC CHANNELS' && c.type === ChannelType.GuildCategory);
-            const privateChannelsCategory = guild.channels.cache.find(c => c.name === 'PRIVATE CHANNELS' && c.type === ChannelType.GuildCategory);
 
             for (const member of membersToProcess) {
                 // Role management
@@ -1879,16 +1877,14 @@ client.on('messageCreate', async message => {
                 if (partnerRole) await member.roles.remove(partnerRole).catch(console.error);
                 await member.roles.add(deadRole).catch(console.error);
 
-                // Remove from special/private channels
-                const categoriesToLeave = [publicChannelsCategory, privateChannelsCategory];
-                for (const category of categoriesToLeave) {
-                    if (category) {
-                        const channels = guild.channels.cache.filter(c => c.parentId === category.id);
-                        for (const channel of channels.values()) {
-                            await channel.permissionOverwrites.delete(member.id, 'Player died').catch(console.error);
-                        }
+                // OPTIMIZED: Find all channels where the member has specific permissions and remove them.
+                const permissionRemovalPromises = [];
+                guild.channels.cache.forEach(channel => {
+                    if (channel.permissionOverwrites.cache.has(member.id)) {
+                        permissionRemovalPromises.push(channel.permissionOverwrites.delete(member.id, 'Player died').catch(console.error));
                     }
-                }
+                });
+                await Promise.all(permissionRemovalPromises);
             }
 
             // Move player's role channel
@@ -2429,7 +2425,7 @@ client.on('messageCreate', async message => {
         }
 
         if ((isPlayer || isAdmin) && mentionedMember) {
-            if (!isAllowedInRoleChannel(message, isAdmin, isAlt)) return;
+            // UPDATED LOGIC: Removed the isAllowedInRoleChannel check.
             const currentSession = await getDocument('votingSessions', message.channel.id);
             if (!currentSession) {
                 return message.reply({ content: 'There is no active voting session in this channel right now.', ephemeral: true });
