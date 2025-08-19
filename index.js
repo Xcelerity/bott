@@ -13,17 +13,14 @@ const DAILY_COOLDOWN = 24 * 60 * 60 * 1000;
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
-    apiKey: process.env.FIREBASE_API_KEY,
-    authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.FIREBASE_APP_ID,
-    measurementId: process.env.FIREBASE_MEASUREMENT_ID
+    apiKey: "AIzaSyDraeeFdMF_gRKSWj7hTFAa8fb3wXbFjEs",
+    authDomain: "babyyoda-d9e80.firebaseapp.com",
+    projectId: "babyyoda-d9e80",
+    storageBucket: "babyyoda-d9e80.firebasestorage.app",
+    messagingSenderId: "439192308588",
+    appId: "1:439192308588:web:f6b9594ffc6a9930fe4149",
+    measurementId: "G-650G4G9E2R"
 };
-
-console.log("Bot Token:", BOT_TOKEN ? "Loaded ✅" : "Missing ❌");
-
 
 // --- Firebase Initialization ---
 let db;
@@ -37,7 +34,7 @@ try {
     console.log("Firebase initialized and connected successfully.");
 } catch (error) {
     console.error("FATAL: Firebase initialization failed. Please check your firebaseConfig.", error);
-    process.exit(1); 
+    process.exit(1);
 }
 
 // --- Client Initialization ---
@@ -56,7 +53,7 @@ client.once('ready', () => {
     client.user.setActivity('the galaxy', { type: 'Watching' });
 
     // Start the interval to check for expired special location lobbies
-    setInterval(checkExpiredLobbies, 60 * 1000); 
+    setInterval(checkExpiredLobbies, 60 * 1000);
 });
 
 // --- Firestore Helper Functions ---
@@ -182,8 +179,8 @@ function createDefaultProfile() {
             },
             specialCount: 2,
         },
-        wallet: 200, 
-        inventory: {}, 
+        wallet: 200,
+        inventory: {},
         lastDailyClaim: 0,
     };
 }
@@ -231,10 +228,10 @@ function isAllowedInRoleChannel(message, isAdmin, isAlt) {
     const sanitizedDisplayName = message.member.displayName.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
 
     // Determine which categories to check based on the user's role
-    const categoriesToCheck = isAlt 
-        ? ['ALTS ROLE CHANNELS'] 
+    const categoriesToCheck = isAlt
+        ? ['ALTS ROLE CHANNELS']
         : ['ROLE CHANNELS', 'WAITING ROLE CHANNELS', '💀 DEAD PLAYERS'];
-    
+
     let userChannels = [];
 
     for (const catName of categoriesToCheck) {
@@ -248,7 +245,7 @@ function isAllowedInRoleChannel(message, isAdmin, isAlt) {
     }
 
     if (!userChannels.some(c => c.id === message.channel.id)) {
-        const replyMessage = isAlt 
+        const replyMessage = isAlt
             ? 'You can only use this command in your private alt channel.'
             : 'You can only use this command in your role channel.';
         message.reply({
@@ -277,7 +274,6 @@ async function resetFullGameState() {
 
 async function executePlayerMove(visitorMember, newShipChannel, narrationType) {
     const guild = visitorMember.guild;
-    const promises = [];
     const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
     const partnerRole = guild.roles.cache.find(r => r.name === 'Partner');
     const pingText = `${thrivingRole || ''} ${partnerRole || ''}`;
@@ -287,64 +283,69 @@ async function executePlayerMove(visitorMember, newShipChannel, narrationType) {
     const partnerMember = partnerId ? await guild.members.fetch(partnerId).catch(() => null) : null;
 
     // --- Vacate old ship(s) ---
-    const assignmentsSnapshot = await getDocs(collection(db, 'shipAssignments'));
-    for (const doc of assignmentsSnapshot.docs) {
+    const shipAssignmentsRef = collection(db, 'shipAssignments');
+    const q = query(shipAssignmentsRef, where('occupants', 'array-contains', visitorMember.id));
+    const oldAssignmentsSnapshot = await getDocs(q);
+
+    const vacatePromises = [];
+    for (const doc of oldAssignmentsSnapshot.docs) {
         const shipId = doc.id;
         let occupants = doc.data().occupants || [];
+        const oldShip = guild.channels.cache.get(shipId);
 
-        if (occupants.includes(visitorMember.id)) {
-            const oldShip = guild.channels.cache.get(shipId);
-            if (oldShip) {
-                // Remove player and partner from occupants array
-                occupants = occupants.filter(id => id !== visitorMember.id && id !== partnerId);
+        if (oldShip) {
+            occupants = occupants.filter(id => id !== visitorMember.id && id !== partnerId);
 
-                promises.push(oldShip.permissionOverwrites.delete(visitorMember.id, 'Player moved ships').catch(console.error));
-                if (partnerMember) {
-                    promises.push(oldShip.permissionOverwrites.delete(partnerMember.id, 'Partner moved with player').catch(console.error));
-                }
+            vacatePromises.push(oldShip.permissionOverwrites.delete(visitorMember.id, 'Player moved ships').catch(console.error));
+            if (partnerMember) {
+                vacatePromises.push(oldShip.permissionOverwrites.delete(partnerMember.id, 'Partner moved with player').catch(console.error));
+            }
 
-                if (occupants.length === 0) {
-                    promises.push(oldShip.setTopic('Occupied by nobody').catch(console.error));
-                    promises.push(deleteDocument('shipAssignments', shipId)); // Clean up empty entry
-                } else {
-                    promises.push(setDocument('shipAssignments', shipId, { occupants }));
-                    const remainingOccupantNames = await Promise.all(occupants.map(async id => (await guild.members.fetch(id).catch(() => null))?.displayName || 'Unknown'));
-                    promises.push(oldShip.setTopic(`Occupied by ${remainingOccupantNames.join(', ')}`).catch(console.error));
-                }
+            if (occupants.length === 0) {
+                vacatePromises.push(oldShip.setTopic('Occupied by nobody').catch(console.error));
+                vacatePromises.push(deleteDocument('shipAssignments', shipId));
+            } else {
+                vacatePromises.push(setDocument('shipAssignments', shipId, { occupants }));
+                // Efficiently fetch remaining members to update topic
+                const remainingMembers = await guild.members.fetch({ user: occupants }).catch(() => new Map());
+                const remainingOccupantNames = occupants.map(id => remainingMembers.get(id)?.displayName || 'Unknown');
+                vacatePromises.push(oldShip.setTopic(`Occupied by ${remainingOccupantNames.join(', ')}`).catch(console.error));
+            }
 
-                if (narrationType === 'loud') {
-                    promises.push(oldShip.send(`${pingText}\n💨 **${visitorMember.displayName}** has left the spaceship.`).catch(console.error));
-                }
+            if (narrationType === 'loud') {
+                vacatePromises.push(oldShip.send(`${pingText}\n💨 **${visitorMember.displayName}** has left the spaceship.`).catch(console.error));
             }
         }
     }
-
-    await Promise.all(promises);
-    promises.length = 0; // Clear promises array for next step
+    await Promise.all(vacatePromises);
 
     // --- Assign new ship ---
-    if (!newShipChannel) return; // Don't assign a new ship if none is provided (e.g., for .dead)
+    if (!newShipChannel) return;
 
+    const assignPromises = [];
     const newShipAssignment = await getDocument('shipAssignments', newShipChannel.id);
     const newOccupants = new Set(newShipAssignment?.occupants || []);
     newOccupants.add(visitorMember.id);
 
-    promises.push(newShipChannel.permissionOverwrites.create(visitorMember.id, { ViewChannel: true, SendMessages: true }).catch(console.error));
+    assignPromises.push(newShipChannel.permissionOverwrites.create(visitorMember.id, { ViewChannel: true, SendMessages: true }).catch(console.error));
     if (partnerMember) {
         newOccupants.add(partnerMember.id);
-        promises.push(newShipChannel.permissionOverwrites.create(partnerMember.id, { ViewChannel: true, SendMessages: true }).catch(console.error));
+        assignPromises.push(newShipChannel.permissionOverwrites.create(partnerMember.id, { ViewChannel: true, SendMessages: true }).catch(console.error));
     }
 
-    // Save the updated occupants list
-    promises.push(setDocument('shipAssignments', newShipChannel.id, { occupants: Array.from(newOccupants) }));
+    const newOccupantsArray = Array.from(newOccupants);
+    assignPromises.push(setDocument('shipAssignments', newShipChannel.id, { occupants: newOccupantsArray }));
 
-    const newOccupantNames = await Promise.all(Array.from(newOccupants).map(async id => (await guild.members.fetch(id).catch(() => null))?.displayName || 'Unknown'));
-    promises.push(newShipChannel.setTopic(`Occupied by ${newOccupantNames.join(', ')}`).catch(console.error));
+    // Efficiently fetch all new occupants for topic update
+    const fetchedMembers = await guild.members.fetch({ user: newOccupantsArray }).catch(() => new Map());
+    const newOccupantNames = newOccupantsArray.map(id => fetchedMembers.get(id)?.displayName || 'Unknown');
+    assignPromises.push(newShipChannel.setTopic(`Occupied by ${newOccupantNames.join(', ')}`).catch(console.error));
+
     if (narrationType === 'loud') {
-        promises.push(newShipChannel.send(`${pingText}\n✨ **${visitorMember.displayName}** has entered the spaceship.`).catch(console.error));
+        assignPromises.push(newShipChannel.send(`${pingText}\n✨ **${visitorMember.displayName}** has entered the spaceship.`).catch(console.error));
     }
 
-    await Promise.all(promises);
+    await Promise.all(assignPromises);
 }
 
 
@@ -1039,12 +1040,12 @@ client.on('messageCreate', async message => {
         if (mentions.size === 0) {
             return message.reply('Please mention at least one player to assign the Alt role.');
         }
-    
+
         let altRole = guild.roles.cache.find(r => r.name === 'Alt');
         if (!altRole) {
             return message.reply('The "Alt" role does not exist. Please run `.create` first.');
         }
-    
+
         // Get or create the category for alt channels
         let altCategory = guild.channels.cache.find(c => c.name === 'ALTS ROLE CHANNELS' && c.type === ChannelType.GuildCategory);
         if (!altCategory) {
@@ -1057,32 +1058,32 @@ client.on('messageCreate', async message => {
                 ]
             });
         }
-    
+
         const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
         const deadRole = guild.roles.cache.find(r => r.name === 'Dead');
-    
+
         for (const member of mentions.values()) {
             await member.roles.add(altRole);
             if (thrivingRole) await member.roles.remove(thrivingRole).catch(() => {});
             if (deadRole) await member.roles.remove(deadRole).catch(() => {});
-    
+
             // Ensure a profile exists for them to track visits
             const playerDoc = await getDocument('players', member.id);
             if (!playerDoc) {
                 await setDocument('players', member.id, createDefaultProfile());
             }
-    
+
             // Create their private channel
             const channelName = member.displayName.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
             const existingChannel = guild.channels.cache.find(c => c.name === channelName && c.parentId === altCategory.id);
             if (!existingChannel) {
-                 const playerChannel = await guild.channels.create({
+                const playerChannel = await guild.channels.create({
                     name: channelName,
                     type: ChannelType.GuildText,
                     parent: altCategory.id,
                     permissionOverwrites: [
-                        { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, 
-                        { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel] }, 
+                        { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+                        { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel] },
                         { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel] }
                     ]
                 });
@@ -2675,13 +2676,14 @@ client.on('messageCreate', async message => {
         };
 
         // 1. Check current spaceship assignment
-        const assignmentsSnapshot = await getDocs(collection(db, 'shipAssignments'));
+        const assignmentsRef = collection(db, 'shipAssignments');
+        const q = query(assignmentsRef, where('occupants', 'array-contains', targetMember.id));
+        const assignmentsSnapshot = await getDocs(q);
+
         assignmentsSnapshot.forEach(doc => {
-            if (doc.data().occupants?.includes(targetMember.id)) {
-                const shipChannel = guild.channels.cache.get(doc.id);
-                if (shipChannel) {
-                    locations.spaceship.push(shipChannel.toString());
-                }
+            const shipChannel = guild.channels.cache.get(doc.id);
+            if (shipChannel) {
+                locations.spaceship.push(shipChannel.toString());
             }
         });
 
@@ -3275,8 +3277,3 @@ async function checkExpiredLobbies() {
 
 // --- Bot Login ---
 client.login(BOT_TOKEN);
-
-
-
-
-
