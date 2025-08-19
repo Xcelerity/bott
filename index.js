@@ -2467,9 +2467,6 @@ client.on('messageCreate', async message => {
     }
     else if (command === 'manipulate' && isAdmin) {
         const mentionedMembers = message.mentions.members;
-        if (mentionedMembers.size !== 2) {
-            return message.reply(`Invalid syntax. Please mention two players: \`${PREFIX}manipulate @voter @target\``);
-        }
 
         const [voter, target] = mentionedMembers.values();
 
