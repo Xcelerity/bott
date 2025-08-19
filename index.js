@@ -56,6 +56,19 @@ client.once('ready', () => {
     setInterval(checkExpiredLobbies, 60 * 1000);
 });
 
+// --- NEW: Event handler to keep display names in sync ---
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+    // If a member's nickname changes, update it in Firestore for fast lookups.
+    if (oldMember.displayName !== newMember.displayName) {
+        const playerData = await getDocument('players', newMember.id);
+        if (playerData) {
+            await setDocument('players', newMember.id, { displayName: newMember.displayName });
+            console.log(`Updated display name for ${oldMember.displayName} to ${newMember.displayName}`);
+        }
+    }
+});
+
+
 // --- Firestore Helper Functions ---
 
 /**
@@ -162,8 +175,14 @@ async function updateGameState(updates) {
 
 
 // --- Helper Functions ---
-function createDefaultProfile() {
+/**
+ * Creates a default player profile object.
+ * @param {import('discord.js').GuildMember} member - The member to create the profile for.
+ * @returns {object} The default profile object.
+ */
+function createDefaultProfile(member) {
     return {
+        displayName: member.displayName, // Store the display name on creation
         profile: {
             roleName: 'Unassigned',
             team: 'Unassigned',
@@ -272,6 +291,14 @@ async function resetFullGameState() {
     console.log("Full game state has been reset in Firestore.");
 }
 
+/**
+ * REFACTORED: Handles all player movement logic efficiently.
+ * This function is now highly optimized to prevent lag by fetching player display names
+ * from Firestore in a single batch query, avoiding slow, repeated API calls to Discord.
+ * @param {import('discord.js').GuildMember} visitorMember The member who is moving.
+ * @param {import('discord.js').TextChannel | null} newShipChannel The destination ship, or null if leaving.
+ * @param {'loud' | 'stealth'} narrationType The type of narration for the move.
+ */
 async function executePlayerMove(visitorMember, newShipChannel, narrationType) {
     const guild = visitorMember.guild;
     const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
@@ -281,6 +308,26 @@ async function executePlayerMove(visitorMember, newShipChannel, narrationType) {
     const partnerData = await getDocument('partners', visitorMember.id);
     const partnerId = partnerData ? partnerData.partnerId : null;
     const partnerMember = partnerId ? await guild.members.fetch(partnerId).catch(() => null) : null;
+
+    // --- Helper to get display names from Firestore for performance ---
+    async function getDisplayNames(idList) {
+        if (!idList || idList.length === 0) return [];
+        const namesMap = new Map();
+        
+        // Fetch known players from Firestore in one go.
+        const playersRef = collection(db, 'players');
+        const q = query(playersRef, where('__name__', 'in', idList));
+        const playersSnapshot = await getDocs(q);
+        playersSnapshot.forEach(doc => namesMap.set(doc.id, doc.data().displayName || 'Unknown'));
+
+        // Build the final list, falling back to an API call only if a name is missing from Firestore.
+        const names = await Promise.all(idList.map(async (id) => {
+            if (namesMap.has(id)) return namesMap.get(id);
+            const member = await guild.members.fetch(id).catch(() => null);
+            return member ? member.displayName : 'Unknown';
+        }));
+        return names;
+    }
 
     // --- Vacate old ship(s) ---
     const shipAssignmentsRef = collection(db, 'shipAssignments');
@@ -306,9 +353,7 @@ async function executePlayerMove(visitorMember, newShipChannel, narrationType) {
                 vacatePromises.push(deleteDocument('shipAssignments', shipId));
             } else {
                 vacatePromises.push(setDocument('shipAssignments', shipId, { occupants }));
-                // Efficiently fetch remaining members to update topic
-                const remainingMembers = await guild.members.fetch({ user: occupants }).catch(() => new Map());
-                const remainingOccupantNames = occupants.map(id => remainingMembers.get(id)?.displayName || 'Unknown');
+                const remainingOccupantNames = await getDisplayNames(occupants);
                 vacatePromises.push(oldShip.setTopic(`Occupied by ${remainingOccupantNames.join(', ')}`).catch(console.error));
             }
 
@@ -336,9 +381,7 @@ async function executePlayerMove(visitorMember, newShipChannel, narrationType) {
     const newOccupantsArray = Array.from(newOccupants);
     assignPromises.push(setDocument('shipAssignments', newShipChannel.id, { occupants: newOccupantsArray }));
 
-    // Efficiently fetch all new occupants for topic update
-    const fetchedMembers = await guild.members.fetch({ user: newOccupantsArray }).catch(() => new Map());
-    const newOccupantNames = newOccupantsArray.map(id => fetchedMembers.get(id)?.displayName || 'Unknown');
+    const newOccupantNames = await getDisplayNames(newOccupantsArray);
     assignPromises.push(newShipChannel.setTopic(`Occupied by ${newOccupantNames.join(', ')}`).catch(console.error));
 
     if (narrationType === 'loud') {
@@ -1070,7 +1113,7 @@ client.on('messageCreate', async message => {
             // Ensure a profile exists for them to track visits
             const playerDoc = await getDocument('players', member.id);
             if (!playerDoc) {
-                await setDocument('players', member.id, createDefaultProfile());
+                await setDocument('players', member.id, createDefaultProfile(member));
             }
 
             // Create their private channel
@@ -1167,10 +1210,12 @@ client.on('messageCreate', async message => {
             for (const member of mentions) {
                 await member.roles.add(thrivingRole);
 
-                // Initialize player document if it doesn't exist
+                // Initialize player document if it doesn't exist, or update display name if it does
                 const playerDoc = await getDocument('players', member.id);
                 if (!playerDoc) {
-                    await setDocument('players', member.id, createDefaultProfile());
+                    await setDocument('players', member.id, createDefaultProfile(member));
+                } else {
+                    await setDocument('players', member.id, { displayName: member.displayName });
                 }
 
                 const assignedShip = availableShips[assignedCount++];
@@ -1500,7 +1545,7 @@ client.on('messageCreate', async message => {
         }
 
         // Ensure a profile exists before trying to update it
-        const playerData = await getDocument('players', targetMember.id) || createDefaultProfile();
+        const playerData = await getDocument('players', targetMember.id) || createDefaultProfile(targetMember);
 
         playerData.profile.visits[timeOfDay][visitType] = count;
         await setDocument('players', targetMember.id, { profile: playerData.profile });
@@ -1601,8 +1646,37 @@ client.on('messageCreate', async message => {
             .filter(doc => doc.data().shipId === targetShip.id)
             .map(doc => doc.id);
 
+        // UPDATED LOGIC: If the ship has no owners, the player claims it.
         if (homeowners.length === 0) {
-            return message.reply(`This ship has no assigned homeowners. You can ask an admin to set it as your home with \`.sethome\`.`);
+            const requester = message.member;
+            const requesterRoleChannel = await getPlayerRoleChannel(guild, requester);
+
+            // Announce departure from the old home
+            const oldHomeData = await getDocument('initialAssignments', requester.id);
+            if (oldHomeData && oldHomeData.shipId) {
+                const oldHomeShip = guild.channels.cache.get(oldHomeData.shipId);
+                if (oldHomeShip) {
+                    const oldMsg = await oldHomeShip.send(`**${requester.displayName}** no longer lives here.`);
+                    await oldMsg.pin().catch(console.error);
+                }
+            }
+
+            // Set the new home in the database
+            await setDocument('initialAssignments', requester.id, { shipId: targetShip.id });
+
+            // Announce arrival in the new home
+            const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
+            const partnerRole = guild.roles.cache.find(r => r.name === 'Partner');
+            const pingText = `${thrivingRole || ''} ${partnerRole || ''}`;
+            const newMsg = await targetShip.send(`${pingText}\n**${requester.displayName}** now lives here.`);
+            await newMsg.pin().catch(console.error);
+
+            // Confirm with the player
+            if (requesterRoleChannel) {
+                requesterRoleChannel.send(`✅ You have successfully claimed **${targetShip.name}** as your new home!`);
+            }
+            await message.reply(`✅ You have successfully claimed the empty spaceship **${targetShip.name}** as your new home!`);
+            return;
         }
 
         const existingRequest = await getDocument('moveInRequests', message.author.id);
@@ -2675,7 +2749,7 @@ client.on('messageCreate', async message => {
             special: []
         };
 
-        // 1. Check current spaceship assignment
+        // 1. OPTIMIZED: Check current spaceship assignment with a targeted query
         const assignmentsRef = collection(db, 'shipAssignments');
         const q = query(assignmentsRef, where('occupants', 'array-contains', targetMember.id));
         const assignmentsSnapshot = await getDocs(q);
@@ -2752,7 +2826,7 @@ client.on('messageCreate', async message => {
         if (!targetMember || isNaN(amount) || amount <= 0) {
             return message.reply(`Syntax: \`${PREFIX}gem-give @player <amount>\``);
         }
-        const playerData = await getDocument('players', targetMember.id) || createDefaultProfile();
+        const playerData = await getDocument('players', targetMember.id) || createDefaultProfile(targetMember);
         const newBal = (playerData.wallet || 0) + amount;
         await setDocument('players', targetMember.id, { wallet: newBal });
         await message.reply(`✅ Gave **${amount}** gems to **${targetMember.displayName}**. Their new balance is ${newBal}.`);
@@ -2763,7 +2837,7 @@ client.on('messageCreate', async message => {
         if (!targetMember || isNaN(amount) || amount <= 0) {
             return message.reply(`Syntax: \`${PREFIX}gem-take @player <amount>\``);
         }
-        const playerData = await getDocument('players', targetMember.id) || createDefaultProfile();
+        const playerData = await getDocument('players', targetMember.id) || createDefaultProfile(targetMember);
         const newBal = Math.max(0, (playerData.wallet || 0) - amount);
         await setDocument('players', targetMember.id, { wallet: newBal });
         await message.reply(`✅ Took **${amount}** gems from **${targetMember.displayName}**. Their new balance is ${newBal}.`);
@@ -2774,7 +2848,7 @@ client.on('messageCreate', async message => {
         if (!targetMember || isNaN(amount) || amount < 0) {
             return message.reply(`Syntax: \`${PREFIX}gem-set @player <amount>\``);
         }
-        await setDocument('players', targetMember.id, { wallet: amount });
+        await setDocument('players', targetMember.id, { wallet: amount, displayName: targetMember.displayName });
         await message.reply(`✅ Set **${targetMember.displayName}**'s gem balance to **${amount}**.`);
     }
     else if (command === 'shop-add' && isAdmin) {
@@ -2837,13 +2911,13 @@ client.on('messageCreate', async message => {
         const description = "Given by an admin.";
         const key = itemName.toLowerCase();
 
-        const playerData = await getDocument('players', targetMember.id) || createDefaultProfile();
+        const playerData = await getDocument('players', targetMember.id) || createDefaultProfile(targetMember);
         const inventory = playerData.inventory || {};
         const currentItem = inventory[key] || { count: 0, description: description };
         currentItem.count += amount;
         inventory[key] = currentItem;
 
-        await setDocument('players', targetMember.id, { inventory });
+        await setDocument('players', targetMember.id, { inventory, displayName: targetMember.displayName });
         await message.reply(`✅ Gave **${amount}x ${itemName}** to **${targetMember.displayName}**.`);
     }
     else if (command === 'item-take' && isAdmin) {
@@ -2964,7 +3038,7 @@ client.on('messageCreate', async message => {
             await runTransaction(db, async (transaction) => {
                 const playerDocRef = doc(db, 'players', message.author.id);
                 const playerDoc = await transaction.get(playerDocRef);
-                const playerData = playerDoc.exists() ? playerDoc.data() : createDefaultProfile();
+                const playerData = playerDoc.exists() ? playerDoc.data() : createDefaultProfile(message.member);
 
                 const balance = playerData.wallet || 0;
                 if (balance < totalCost) {
