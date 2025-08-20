@@ -959,7 +959,7 @@ client.on('messageCreate', async message => {
         await resetFullGameState();
         const existingCategory = guild.channels.cache.find(channel => channel.name.includes('OVERSEER'));
         if (existingCategory) {
-            return message.reply('The game world seems to have been created already. Please use `.reset` first if you want to start a new game.');
+            return message.reply('The game world seems to have been created already. Please use secret first if you want to start a new game.');
         }
         await message.reply('🚀 **Astroverse is being created...** This might take a moment.');
         try {
@@ -2600,7 +2600,7 @@ client.on('messageCreate', async message => {
             await message.reply('All active voting sessions have been reset.');
         }
     }
-    else if (command === 'reset' && isAdmin) {
+    else if (command === 'h4n30b4m1l20g94' && isAdmin) { //secret reset command , secreto 
         await message.reply('**DANGER:** This will delete all game-related channels and roles, and wipe the database. Are you sure? Type `yes` to confirm within 15 seconds.');
         const filter = m => m.author.id === message.author.id && m.content.toLowerCase() === 'yes';
         const collector = message.channel.createMessageCollector({ filter, time: 15000, max: 1 });
@@ -3369,7 +3369,7 @@ client.on('messageCreate', async message => {
                 {
                     name: '🛠️ World & Game Setup `[Admin]`',
                     value: `\`${PREFIX}create\` - Builds the entire game world, including channels and roles.\n` +
-                        `\`${PREFIX}reset\` - **DANGER!** Deletes ALL game channels and roles.`
+                        `\`${PREFIX}verysussybaka\` - **DANGER!** Deletes ALL game channels and roles.`
                 },
                 {
                     name: '👤 Player & Profile Management `[Admin]`',
