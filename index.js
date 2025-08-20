@@ -1754,45 +1754,56 @@ client.on('messageCreate', async message => {
         const targetIsAlt = targetMember.roles.cache.some(r => r.name === 'Alt');
 
         const profileEmbed = new EmbedBuilder()
-            .setColor('Purple')
-            .setTitle(`${targetMember.displayName}'s Profile`)
-            .setThumbnail(targetMember.displayAvatarURL())
-            .addFields(
-                { name: 'Day Visits', value: `**Regular:** ${profile.visits.day.regular}\n**Special:** ${profile.visits.day.special}\n**Stealth:** ${profile.visits.day.stealth}`, inline: true },
-                { name: 'Night Visits', value: `**Regular:** ${profile.visits.night.regular}\n**Special:** ${profile.visits.night.special}\n**Stealth:** ${profile.visits.night.stealth}`, inline: true },
-            )
-            .setTimestamp();
-
-        // Add detailed fields only if the player is not an Alt
+            .setColor('#00ffff') // A futuristic cyan color
+            .setAuthor({ name: `HOLOGRAPHIC PROFILE /// ${targetMember.displayName}`, iconURL: 'https://i.imgur.com/6Ei2g3V.png' })
+            .setThumbnail(targetMember.displayAvatarURL({ dynamic: true, size: 256 }))
+            .setTimestamp()
+            .setFooter({ text: 'Astroverse Terminal', iconURL: 'https://i.imgur.com/6Ei2g3V.png' });
+    
+        const wallet = playerData.wallet || 0;
+        const inventory = playerData.inventory || {};
+        const itemCount = Object.values(inventory).reduce((sum, item) => sum + item.count, 0);
+        profileEmbed.addFields({
+            name: '`[ 💎 RESOURCE MANIFEST ]`',
+            value: `**Gems:** ${wallet}\n**Items:** ${itemCount} held`
+        });
+    
+        profileEmbed.addFields(
+            { name: '`[ 🚀 DAYTIME LOGS ]`', value: `**Regular:** ${profile.visits.day.regular}\n**Special:** ${profile.visits.day.special}\n**Stealth:** ${profile.visits.day.stealth}`, inline: true },
+            { name: '`[ 🌙 NIGHTTIME LOGS ]`', value: `**Regular:** ${profile.visits.night.regular}\n**Special:** ${profile.visits.night.special}\n**Stealth:** ${profile.visits.night.stealth}`, inline: true },
+        );
+    
         if (!targetIsAlt) {
             const showPriority = isAdmin && !isViewingSelf;
-
+    
             const innateSuperpowersText = profile.abilities.passive.length > 0
                 ? profile.abilities.passive
                     .sort((a, b) => a.priority - b.priority)
-                    .map((a, i) => `**[I${i + 1}]** ${showPriority ? `(P:${a.priority}) ` : ''}${a.description}`)
+                    .map((a, i) => `> **[I${i + 1}]** ${showPriority ? `(P:${a.priority}) ` : ''}${a.description}`)
                     .join('\n')
-                : 'None';
-
+                : '> No protocols installed.';
+    
             const superpowersText = profile.abilities.active.length > 0
                 ? profile.abilities.active
                     .sort((a, b) => a.priority - b.priority)
-                    .map((a, i) => `**[S${i + 1}]** ${showPriority ? `(P:${a.priority}) ` : ''}[${a.category}] ${a.description}`)
+                    .map((a, i) => `> **[S${i + 1}]** ${showPriority ? `(P:${a.priority}) ` : ''}[${a.category}] ${a.description}`)
                     .join('\n')
-                : 'None';
-
+                : '> No abilities available.';
+    
             profileEmbed.addFields(
-                { name: 'Introduction', value: `**Role Name:** ${profile.roleName}\n**Team:** ${profile.team}\n**Ability Categories:** ${profile.abilityCategories.join(', ') || 'None'}` },
-                { name: 'Lore', value: profile.lore || 'Not set.' },
-                { name: 'Special Entries Left', value: `**Count:** ${profile.specialCount}`, inline: true },
-                { name: '\u200B', value: '\u200B' }, // Spacer
-                { name: 'Innate Superpowers', value: innateSuperpowersText },
-                { name: 'Superpowers', value: superpowersText }
-            ).setFooter({ text: 'This information is private to you.' });
+                { name: '\u200B', value: '\u200B' },
+                { name: '`[ 🆔 IDENTIFICATION ]`', value: `**Designation:** ${profile.roleName}\n**Affiliation:** ${profile.team}` },
+                { name: '`[ 📜 BIOMETRIC LORE ]`', value: `>>> ${profile.lore || 'Not set.'}` },
+                { name: '`[ ✨ SPECIAL ENTRIES ]`', value: `**Charges:** ${profile.specialCount}`, inline: true },
+                { name: '\u200B', value: '\u200B', inline: true },
+                { name: '\u200B', value: '\u200B', inline: true },
+                { name: '`[ ⚙️ CORE PROTOCOLS (PASSIVE) ]`', value: innateSuperpowersText },
+                { name: '`[ ⚡ ACTIVE ABILITIES ]`', value: superpowersText }
+            );
         } else {
-             profileEmbed.setFooter({ text: 'Alt Profile View' });
+            profileEmbed.setDescription('**Status:** Standby Mode (Alt Account)');
         }
-
+    
         await message.channel.send({ embeds: [profileEmbed] });
     }
     else if (command === 'list-ships' && isAdmin) {
