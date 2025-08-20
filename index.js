@@ -304,7 +304,8 @@ async function executePlayerMove(visitorMember, newShipChannel, narrationType) {
     const guild = visitorMember.guild;
     const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
     const partnerRole = guild.roles.cache.find(r => r.name === 'Partner');
-    const pingText = `${thrivingRole || ''} ${partnerRole || ''}`;
+    const challengerRole = guild.roles.cache.find(r => r.name === 'Challenger');
+    const pingText = `${thrivingRole || ''} ${partnerRole || ''} ${challengerRole || ''}`;
 
     const partnerData = await getDocument('partners', visitorMember.id);
     const partnerId = partnerData ? partnerData.partnerId : null;
@@ -914,7 +915,8 @@ client.on('interactionCreate', async interaction => {
 
                 const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
                 const partnerRole = guild.roles.cache.find(r => r.name === 'Partner');
-                const pingText = `${thrivingRole || ''} ${partnerRole || ''}`;
+                const challengerRole = guild.roles.cache.find(r => r.name === 'Challenger');
+                const pingText = `${thrivingRole || ''} ${partnerRole || ''} ${challengerRole || ''}`;
                 const newMsg = await targetShip.send(`${pingText}\n**${requester.displayName}** now lives here.`);
                 await newMsg.pin().catch(console.error);
 
@@ -946,7 +948,7 @@ client.on('messageCreate', async message => {
     const isAlt = message.member.roles.cache.some(r => r.name === 'Alt'); // New role check
     const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
 
-    const playerCommands = ['profile', 'visit', 'vote', 'preset', 'home', 'movein', 'action', 'visitspecial', 'bal', 'balance', 'daily', 'shop', 'buy', 'inv', 'inventory', 'countday', 'whisper'];
+    const playerCommands = ['profile', 'visit', 'vote', 'preset', 'home', 'movein', 'action', 'visitspecial', 'bal', 'balance', 'daily', 'shop', 'buy', 'inv', 'inventory', 'countday', 'whisper', 'sos'];
     const adminOnlyCommands = ['create', 'thriving', 'challenger', 'alt', 'close', 'list-ships', 'pc', 'dead', 'night', 'day', 'allowvisits', 'manipulate', 'votereset', 'reset', 'set-role-profile', 'set-visits', 'add-ability', 'public', 'setknocktimer', 'sethome', 'backhome', 'set-categories', 'allpresets', 'addpartner', 'destroy', 'special_to_regular', 'stealth_to_regular', 'visitblock', 'destroydoor', 'revive', 'alive', 'actions', 'sls', 'blackhole', 'cygnus', 'la', 'setspecialcount', 'where', 'gem-give', 'gem-take', 'gem-set', 'shop-add', 'shop-add-role', 'shop-remove', 'item-give', 'item-take', 'giveos', 'teleport', 'set-lore', 'count', 'setwhisperlimit'];
 
     if (adminOnlyCommands.includes(command) && !isAdmin) {
@@ -1425,7 +1427,8 @@ client.on('messageCreate', async message => {
 
         const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
         const partnerRole = guild.roles.cache.find(r => r.name === 'Partner');
-        const pingText = `${thrivingRole || ''} ${partnerRole || ''}`;
+        const challengerRole = guild.roles.cache.find(r => r.name === 'Challenger');
+        const pingText = `${thrivingRole || ''} ${partnerRole || ''} ${challengerRole || ''}`;
 
         const newMsg = await newHomeShip.send(`${pingText}\n**${targetMember.displayName}** now lives here.`);
         await newMsg.pin().catch(console.error);
@@ -1668,7 +1671,8 @@ client.on('messageCreate', async message => {
             // Announce arrival in the new home
             const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
             const partnerRole = guild.roles.cache.find(r => r.name === 'Partner');
-            const pingText = `${thrivingRole || ''} ${partnerRole || ''}`;
+            const challengerRole = guild.roles.cache.find(r => r.name === 'Challenger');
+            const pingText = `${thrivingRole || ''} ${partnerRole || ''} ${challengerRole || ''}`;
             const newMsg = await targetShip.send(`${pingText}\n**${requester.displayName}** now lives here.`);
             await newMsg.pin().catch(console.error);
 
@@ -1694,7 +1698,8 @@ client.on('messageCreate', async message => {
 
         const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
         const partnerRole = guild.roles.cache.find(r => r.name === 'Partner');
-        const pingText = `${thrivingRole || ''} ${partnerRole || ''}`;
+        const challengerRole = guild.roles.cache.find(r => r.name === 'Challenger');
+        const pingText = `${thrivingRole || ''} ${partnerRole || ''} ${challengerRole || ''}`;
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`movein-allow_${message.author.id}`).setLabel('Allow').setStyle(ButtonStyle.Success),
@@ -1957,8 +1962,11 @@ client.on('messageCreate', async message => {
         }
 
         const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
-        if (!thrivingRole) {
-            return message.reply('The "Thriving" role could not be found. Please create it or run `.thriving` on a player first.');
+        const partnerRole = guild.roles.cache.find(r => r.name === 'Partner');
+        const challengerRole = guild.roles.cache.find(r => r.name === 'Challenger');
+
+        if (!thrivingRole || !partnerRole) {
+            return message.reply('The "Thriving" and/or "Partner" roles could not be found.');
         }
 
         try {
@@ -1967,7 +1975,13 @@ client.on('messageCreate', async message => {
                 SendMessages: false,
                 AddReactions: false
             });
-            await message.reply(`📢 This spaceship is now public. All thriving players can see messages here, but cannot talk.`);
+            await message.channel.permissionOverwrites.edit(partnerRole.id, {
+                ViewChannel: true,
+                SendMessages: false,
+                AddReactions: false
+            });
+            const pingText = `${thrivingRole || ''} ${partnerRole || ''} ${challengerRole || ''}`;
+            await message.reply(`${pingText} The Spaceship is now Public`);
         } catch (error) {
             console.error('Error in .public command:', error);
             await message.channel.send('An error occurred while setting permissions. Please check my `Manage Channels` permission.');
@@ -2195,7 +2209,8 @@ client.on('messageCreate', async message => {
             if (occupants.length > 0) {
                 const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
                 const partnerRole = guild.roles.cache.find(r => r.name === 'Partner');
-                const pingText = `${thrivingRole || ''} ${partnerRole || ''}`;
+                const challengerRole = guild.roles.cache.find(r => r.name === 'Challenger');
+                const pingText = `${thrivingRole || ''} ${partnerRole || ''} ${challengerRole || ''}`;
 
                 const row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId(`visit-open_${message.author.id}_${targetShip.id}`).setLabel('Open Door').setStyle(ButtonStyle.Success),
@@ -2638,7 +2653,8 @@ client.on('messageCreate', async message => {
         const announcementChannel = guild.channels.cache.find(c => c.name === 'announcement');
         const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
         const partnerRole = guild.roles.cache.find(r => r.name === 'Partner');
-        const pingText = `${thrivingRole || ''} ${partnerRole || ''}`;
+        const challengerRole = guild.roles.cache.find(r => r.name === 'Challenger');
+        const pingText = `${thrivingRole || ''} ${partnerRole || ''} ${challengerRole || ''}`;
 
         announcementChannel?.send(`${pingText}\n💥 **${targetShip.name}** has been destroyed!`);
 
@@ -3092,57 +3108,119 @@ client.on('messageCreate', async message => {
             return message.reply('You must have the "Thriving" or "Alt" role to use this command.');
         }
         if (!isAllowedInRoleChannel(message, isAdmin, isAlt)) return;
-
-        const whisperItemKey = '🤫whisper';
+    
+        const whisperItemKey = 'whisper';
         const playerData = await getDocument('players', message.author.id);
         const inventory = playerData?.inventory || {};
         const whisperItem = inventory[whisperItemKey];
-
+    
         if (!whisperItem || whisperItem.count <= 0) {
             return message.reply(`You don't have a "${whisperItemKey}" item to use this command. You can buy one from the \`.shop\`.`);
         }
-
+    
         const type = args[0]?.toLowerCase();
         const messageMatch = message.content.match(/"(.*?)"/);
         const whisperMessage = messageMatch ? messageMatch[1] : null;
-        const targetMember = message.mentions.members.last(); // Target is the last mention
-
-        if (!['anonymous', 'regular'].includes(type) || !whisperMessage || !targetMember) {
-            return message.reply(`Invalid syntax. Use: \`${PREFIX}whisper <anonymous|regular> "message" @target\``);
+    
+        if (!['anonymous', 'regular'].includes(type) || !whisperMessage) {
+            return message.reply(`Invalid syntax. Use: \`${PREFIX}whisper <anonymous|regular> "message" <target-name>\``);
         }
+    
+        const targetName = message.content.substring(messageMatch.index + messageMatch[0].length).trim();
+        if (!targetName) {
+            return message.reply(`You must specify a target player's name. Use: \`${PREFIX}whisper <anonymous|regular> "message" <target-name>\``);
+        }
+    
+        const targetMember = guild.members.cache.find(m => m.displayName.toLowerCase() === targetName.toLowerCase());
+    
+        if (!targetMember) {
+            return message.reply(`Could not find a player with the name "${targetName}".`);
+        }
+    
         if (targetMember.id === message.author.id) {
             return message.reply("You cannot whisper to yourself.");
         }
         if (!targetMember.roles.cache.some(r => r.name === 'Thriving' || r.name === 'Alt')) {
             return message.reply("You can only whisper to other Thriving players or Alts.");
         }
-
+    
         const gameState = await getGameState();
         const words = whisperMessage.trim().split(/\s+/);
         if (words.length > gameState.whisperWordLimit) {
             return message.reply(`Your whisper is too long. The maximum length is **${gameState.whisperWordLimit}** words.`);
         }
-
+    
         const targetRoleChannel = await getPlayerRoleChannel(guild, targetMember);
         if (!targetRoleChannel) {
             return message.reply(`I could not find the role channel for **${targetMember.displayName}**.`);
         }
-
+    
         // Consume the item
         whisperItem.count--;
         if (whisperItem.count <= 0) {
             delete inventory[whisperItemKey];
         }
         await setDocument('players', message.author.id, { inventory });
-
+    
         // Send the whisper
         if (type === 'anonymous') {
             await targetRoleChannel.send(`🤫 A mysterious whisper arrives: *"${whisperMessage}"*`);
         } else { // regular
             await targetRoleChannel.send(`🗣️ A whisper arrives from **${message.member.displayName}**: *"${whisperMessage}"*`);
         }
-
+    
         await message.reply({ content: `Your whisper has been sent to **${targetMember.displayName}**. You have ${whisperItem.count} whisper(s) left.`, ephemeral: true });
+    }
+    else if (command === 'sos') {
+        if (!isPlayer && !isAlt && !isAdmin) {
+            return message.reply('You must have the "Thriving" or "Alt" role to use this command.');
+        }
+        if (!isAllowedInRoleChannel(message, isAdmin, isAlt)) return;
+
+        const sosItemKey = 'sos';
+        const playerData = await getDocument('players', message.author.id);
+        const inventory = playerData?.inventory || {};
+        const sosItem = inventory[sosItemKey];
+
+        if (!sosItem || sosItem.count <= 0) {
+            return message.reply(`You don't have an "sos" item to use this command. You can buy one from the \`.shop\`.`);
+        }
+        
+        // Consume the item
+        sosItem.count--;
+        if (sosItem.count <= 0) {
+            delete inventory[sosItemKey];
+        }
+        await setDocument('players', message.author.id, { inventory });
+
+        // Find current location
+        const assignmentsRef = collection(db, 'shipAssignments');
+        const q = query(assignmentsRef, where('occupants', 'array-contains', message.author.id));
+        const assignmentsSnapshot = await getDocs(q);
+
+        if (assignmentsSnapshot.empty) {
+            return message.reply("You are not currently in a spaceship to send an SOS from.");
+        }
+
+        const shipId = assignmentsSnapshot.docs[0].id;
+        const shipChannel = guild.channels.cache.get(shipId);
+
+        if (!shipChannel) {
+            return message.reply("Could not identify your current location.");
+        }
+
+        const announcementChannel = guild.channels.cache.find(c => c.name === 'announcement');
+        if (!announcementChannel) {
+            return message.reply("Could not find the announcement channel to send the SOS.");
+        }
+
+        const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
+        const partnerRole = guild.roles.cache.find(r => r.name === 'Partner');
+        const challengerRole = guild.roles.cache.find(r => r.name === 'Challenger');
+        const pingText = `${thrivingRole || ''} ${partnerRole || ''} ${challengerRole || ''}`;
+
+        await announcementChannel.send(`${pingText}\n🚨 **SOS!** An emergency signal has been received from **${message.member.displayName}** located at **${shipChannel.toString()}**!`);
+        await message.reply({ content: `Your SOS has been broadcasted. You have ${sosItem.count} SOS item(s) left.`, ephemeral: true });
     }
     else if (command === 'countday') {
         const targetMember = message.mentions.members.first() || message.member;
@@ -3366,7 +3444,8 @@ client.on('messageCreate', async message => {
                         `\`${PREFIX}movein #spaceship-channel\` - Request to make your currently visited ship your new home.\n` +
                         `\`${PREFIX}preset <ability-code> <target>\` - Sets your action (e.g., \`.preset s1 @Player\`).\n` +
                         `\`${PREFIX}action <ability-code> "<description>"\` - Logs a custom action for admins.\n` +
-                        `\`${PREFIX}whisper <anon|reg> "msg" @target\` - Sends a private message if you own a '🤫whisper' item.\n`+
+                        `\`${PREFIX}whisper <anon|reg> "msg" <target-name>\` - Sends a private message if you own a 'whisper' item.\n`+
+                        `\`${PREFIX}sos\` - Broadcasts your location if you own an 'sos' item.\n` +
                         `\`${PREFIX}visit <regular|special|stealth> <ship-number>\` - Visit another spaceship.\n` +
                         `\`${PREFIX}visitspecial <1-4>\` - Access a special location during the night.\n` +
                         `\`${PREFIX}vote @Player\` - Cast or change your vote in an active voting channel.`
