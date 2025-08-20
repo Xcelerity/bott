@@ -160,6 +160,7 @@ async function getGameState() {
         visitsAllowed: false,
         knockTimeout: 2 * 60 * 1000,
         visitBlockedPlayers: [],
+        whisperWordLimit: 10, // New default value
     };
     // Merge defaults with the retrieved state to ensure all properties exist.
     return { ...defaults, ...state };
@@ -477,7 +478,7 @@ async function getPlayerRoleChannel(guild, player) {
 
     // Search in relevant categories
     return guild.channels.cache.find(c =>
-        (c.parent?.name === 'ROLE CHANNELS' || c.parent?.name === '💀 DEAD PLAYERS' || c.parent?.name === 'WAITING ROLE CHANNELS') &&
+        (c.parent?.name === 'ROLE CHANNELS' || c.parent?.name === '💀 DEAD PLAYERS' || c.parent?.name === 'WAITING ROLE CHANNELS' || c.parent?.name === 'ALTS ROLE CHANNELS') &&
         c.name.startsWith(sanitizedDisplayName)
     );
 }
@@ -945,8 +946,8 @@ client.on('messageCreate', async message => {
     const isAlt = message.member.roles.cache.some(r => r.name === 'Alt'); // New role check
     const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
 
-    const playerCommands = ['profile', 'visit', 'vote', 'preset', 'home', 'movein', 'action', 'visitspecial', 'bal', 'balance', 'daily', 'shop', 'buy', 'inv', 'inventory', 'countday'];
-    const adminOnlyCommands = ['create', 'thriving', 'challenger', 'alt', 'close', 'list-ships', 'pc', 'dead', 'night', 'day', 'allowvisits', 'manipulate', 'votereset', 'reset', 'set-role-profile', 'set-visits', 'add-ability', 'public', 'setknocktimer', 'sethome', 'backhome', 'set-categories', 'allpresets', 'addpartner', 'destroy', 'special_to_regular', 'stealth_to_regular', 'visitblock', 'destroydoor', 'revive', 'alive', 'actions', 'sls', 'blackhole', 'cygnus', 'la', 'setspecialcount', 'where', 'gem-give', 'gem-take', 'gem-set', 'shop-add', 'shop-add-role', 'shop-remove', 'item-give', 'item-take', 'giveos', 'teleport', 'set-lore', 'count'];
+    const playerCommands = ['profile', 'visit', 'vote', 'preset', 'home', 'movein', 'action', 'visitspecial', 'bal', 'balance', 'daily', 'shop', 'buy', 'inv', 'inventory', 'countday', 'whisper'];
+    const adminOnlyCommands = ['create', 'thriving', 'challenger', 'alt', 'close', 'list-ships', 'pc', 'dead', 'night', 'day', 'allowvisits', 'manipulate', 'votereset', 'reset', 'set-role-profile', 'set-visits', 'add-ability', 'public', 'setknocktimer', 'sethome', 'backhome', 'set-categories', 'allpresets', 'addpartner', 'destroy', 'special_to_regular', 'stealth_to_regular', 'visitblock', 'destroydoor', 'revive', 'alive', 'actions', 'sls', 'blackhole', 'cygnus', 'la', 'setspecialcount', 'where', 'gem-give', 'gem-take', 'gem-set', 'shop-add', 'shop-add-role', 'shop-remove', 'item-give', 'item-take', 'giveos', 'teleport', 'set-lore', 'count', 'setwhisperlimit'];
 
     if (adminOnlyCommands.includes(command) && !isAdmin) {
         return message.reply('You must be an Administrator to use that command.');
@@ -1981,6 +1982,14 @@ client.on('messageCreate', async message => {
         await updateGameState({ knockTimeout: minutes * 60 * 1000 });
         await message.reply(`⏰ The auto-open timer for knocks has been set to **${minutes}** minute(s).`);
     }
+    else if (command === 'setwhisperlimit' && isAdmin) {
+        const limit = parseInt(args[0]);
+        if (isNaN(limit) || limit < 0) {
+            return message.reply(`Invalid syntax. Please provide a positive number for the word limit. Usage: \`${PREFIX}setwhisperlimit <number>\``);
+        }
+        await updateGameState({ whisperWordLimit: limit });
+        await message.reply(`🤫 The word limit for whispers has been set to **${limit}** words.`);
+    }
     else if (command === 'night' && isAdmin) {
         await updateGameState({ isNight: true, visitsAllowed: false });
         await setDaytimePermissions(guild, false);
@@ -2467,8 +2476,16 @@ client.on('messageCreate', async message => {
     }
     else if (command === 'manipulate' && isAdmin) {
         const mentionedMembers = message.mentions.members;
+        if (mentionedMembers.size < 1 || mentionedMembers.size > 2) {
+            return message.reply(`Invalid syntax. Please mention one or two players: \`${PREFIX}manipulate @voter [@target]\``);
+        }
 
-        const [voter, target] = mentionedMembers.values();
+        let voter, target;
+        if (mentionedMembers.size === 1) {
+            voter = target = mentionedMembers.first();
+        } else {
+            [voter, target] = mentionedMembers.values();
+        }
 
         if (!voter.roles.cache.some(r => r.name === 'Thriving') || !target.roles.cache.some(r => r.name === 'Thriving')) {
             return message.reply('Both players involved in a manipulation must have the "Thriving" role.');
@@ -2500,7 +2517,10 @@ client.on('messageCreate', async message => {
         await setDocument('votingSessions', message.channel.id, { votes, playerVotes });
 
         await updateVoteCount(message.channel);
-        await message.channel.send(`✅ Manipulated **${voter.displayName}** to vote for **${target.displayName}**.`);
+        const confirmationText = voter.id === target.id
+            ? `✅ Manipulated **${voter.displayName}** to vote for **themselves**.`
+            : `✅ Manipulated **${voter.displayName}** to vote for **${target.displayName}**.`;
+        await message.channel.send(confirmationText);
     }
     else if (command === 'allpresets' && isAdmin) {
         const presetsSnapshot = await getDocs(collection(db, 'presets'));
@@ -3067,6 +3087,63 @@ client.on('messageCreate', async message => {
             await message.reply(e.message || "An error occurred during your purchase. Please try again.");
         }
     }
+    else if (command === 'whisper') {
+        if (!isPlayer && !isAlt && !isAdmin) {
+            return message.reply('You must have the "Thriving" or "Alt" role to use this command.');
+        }
+        if (!isAllowedInRoleChannel(message, isAdmin, isAlt)) return;
+
+        const whisperItemKey = '🤫whisper';
+        const playerData = await getDocument('players', message.author.id);
+        const inventory = playerData?.inventory || {};
+        const whisperItem = inventory[whisperItemKey];
+
+        if (!whisperItem || whisperItem.count <= 0) {
+            return message.reply(`You don't have a "${whisperItemKey}" item to use this command. You can buy one from the \`.shop\`.`);
+        }
+
+        const type = args[0]?.toLowerCase();
+        const messageMatch = message.content.match(/"(.*?)"/);
+        const whisperMessage = messageMatch ? messageMatch[1] : null;
+        const targetMember = message.mentions.members.last(); // Target is the last mention
+
+        if (!['anonymous', 'regular'].includes(type) || !whisperMessage || !targetMember) {
+            return message.reply(`Invalid syntax. Use: \`${PREFIX}whisper <anonymous|regular> "message" @target\``);
+        }
+        if (targetMember.id === message.author.id) {
+            return message.reply("You cannot whisper to yourself.");
+        }
+        if (!targetMember.roles.cache.some(r => r.name === 'Thriving' || r.name === 'Alt')) {
+            return message.reply("You can only whisper to other Thriving players or Alts.");
+        }
+
+        const gameState = await getGameState();
+        const words = whisperMessage.trim().split(/\s+/);
+        if (words.length > gameState.whisperWordLimit) {
+            return message.reply(`Your whisper is too long. The maximum length is **${gameState.whisperWordLimit}** words.`);
+        }
+
+        const targetRoleChannel = await getPlayerRoleChannel(guild, targetMember);
+        if (!targetRoleChannel) {
+            return message.reply(`I could not find the role channel for **${targetMember.displayName}**.`);
+        }
+
+        // Consume the item
+        whisperItem.count--;
+        if (whisperItem.count <= 0) {
+            delete inventory[whisperItemKey];
+        }
+        await setDocument('players', message.author.id, { inventory });
+
+        // Send the whisper
+        if (type === 'anonymous') {
+            await targetRoleChannel.send(`🤫 A mysterious whisper arrives: *"${whisperMessage}"*`);
+        } else { // regular
+            await targetRoleChannel.send(`🗣️ A whisper arrives from **${message.member.displayName}**: *"${whisperMessage}"*`);
+        }
+
+        await message.reply({ content: `Your whisper has been sent to **${targetMember.displayName}**. You have ${whisperItem.count} whisper(s) left.`, ephemeral: true });
+    }
     else if (command === 'countday') {
         const targetMember = message.mentions.members.first() || message.member;
         if (!isAdmin && targetMember.id !== message.author.id) {
@@ -3261,9 +3338,10 @@ client.on('messageCreate', async message => {
                     value: `\`${PREFIX}day\` / \`${PREFIX}night\` - Transitions the game phase and **locks** visits.\n` +
                         `\`${PREFIX}allowvisits\` - Unlocks the \`.visit\` command for the current phase.\n` +
                         `\`${PREFIX}setknocktimer <minutes>\` - Sets the auto-open timer for knocks.\n` +
+                        `\`${PREFIX}setwhisperlimit <number>\` - Sets the word limit for whispers.\n` +
                         `\`${PREFIX}vote #voting-channel-x\` - Starts a voting session in a channel.\n` +
                         `\`${PREFIX}votereset [#channel]\` - Resets one or all voting sessions.\n` +
-                        `\`${PREFIX}manipulate @Voter @Target\` - Forces one player to vote for another.\n` +
+                        `\`${PREFIX}manipulate @Voter [@Target]\` - Forces one player to vote for another (or themselves).\n` +
                         `\`${PREFIX}visitblock @Player <yes|no>\` - Blocks or unblocks a player from visiting.`
                 },
                 {
@@ -3288,6 +3366,7 @@ client.on('messageCreate', async message => {
                         `\`${PREFIX}movein #spaceship-channel\` - Request to make your currently visited ship your new home.\n` +
                         `\`${PREFIX}preset <ability-code> <target>\` - Sets your action (e.g., \`.preset s1 @Player\`).\n` +
                         `\`${PREFIX}action <ability-code> "<description>"\` - Logs a custom action for admins.\n` +
+                        `\`${PREFIX}whisper <anon|reg> "msg" @target\` - Sends a private message if you own a '🤫whisper' item.\n`+
                         `\`${PREFIX}visit <regular|special|stealth> <ship-number>\` - Visit another spaceship.\n` +
                         `\`${PREFIX}visitspecial <1-4>\` - Access a special location during the night.\n` +
                         `\`${PREFIX}vote @Player\` - Cast or change your vote in an active voting channel.`
