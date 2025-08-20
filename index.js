@@ -1755,22 +1755,22 @@ client.on('messageCreate', async message => {
 
         const profileEmbed = new EmbedBuilder()
             .setColor('#00ffff') // A futuristic cyan color
-            .setAuthor({ name: `HOLOGRAPHIC PROFILE /// ${targetMember.displayName}`, iconURL: 'https://i.imgur.com/6Ei2g3V.png' })
+            .setAuthor({ name: `Welcome ${targetMember.displayName}`, iconURL: 'https://img.freepik.com/free-psd/stunning-3d-render-ringed-planet-celestial-body-cosmic-wonder_191095-79308.jpg?semt=ais_hybrid&w=740&q=80' })
             .setThumbnail(targetMember.displayAvatarURL({ dynamic: true, size: 256 }))
             .setTimestamp()
-            .setFooter({ text: 'Astroverse Terminal', iconURL: 'https://i.imgur.com/6Ei2g3V.png' });
+            .setFooter({ text: 'Astroverse Terminal', iconURL: 'https://img.freepik.com/free-psd/stunning-3d-render-ringed-planet-celestial-body-cosmic-wonder_191095-79308.jpg?semt=ais_hybrid&w=740&q=80' });
     
         const wallet = playerData.wallet || 0;
         const inventory = playerData.inventory || {};
         const itemCount = Object.values(inventory).reduce((sum, item) => sum + item.count, 0);
         profileEmbed.addFields({
-            name: '`[ 💎 RESOURCE MANIFEST ]`',
+            name: '`[ 💎 RESOURCES ]`',
             value: `**Gems:** ${wallet}\n**Items:** ${itemCount} held`
         });
     
         profileEmbed.addFields(
-            { name: '`[ 🚀 DAYTIME LOGS ]`', value: `**Regular:** ${profile.visits.day.regular}\n**Special:** ${profile.visits.day.special}\n**Stealth:** ${profile.visits.day.stealth}`, inline: true },
-            { name: '`[ 🌙 NIGHTTIME LOGS ]`', value: `**Regular:** ${profile.visits.night.regular}\n**Special:** ${profile.visits.night.special}\n**Stealth:** ${profile.visits.night.stealth}`, inline: true },
+            { name: '`[ 🚀 DAY VISITS ]`', value: `**Regular:** ${profile.visits.day.regular}\n**Special:** ${profile.visits.day.special}\n**Stealth:** ${profile.visits.day.stealth}`, inline: true },
+            { name: '`[ 🌙 NIGHT VISITS ]`', value: `**Regular:** ${profile.visits.night.regular}\n**Special:** ${profile.visits.night.special}\n**Stealth:** ${profile.visits.night.stealth}`, inline: true },
         );
     
         if (!targetIsAlt) {
@@ -1792,13 +1792,13 @@ client.on('messageCreate', async message => {
     
             profileEmbed.addFields(
                 { name: '\u200B', value: '\u200B' },
-                { name: '`[ 🆔 IDENTIFICATION ]`', value: `**Designation:** ${profile.roleName}\n**Affiliation:** ${profile.team}` },
-                { name: '`[ 📜 BIOMETRIC LORE ]`', value: `>>> ${profile.lore || 'Not set.'}` },
-                { name: '`[ ✨ SPECIAL ENTRIES ]`', value: `**Charges:** ${profile.specialCount}`, inline: true },
+                { name: '`[ 🆔 INTRODUCTION ]`', value: `**Role Name:** ${profile.roleName}\n**Team:** ${profile.team}` },
+                { name: '`[ 📜 LORE ]`', value: `>>> ${profile.lore || 'Not set.'}` },
+                { name: '`[ ✨ SPECIAL ENTRIES ]`', value: `**Visits Left:** ${profile.specialCount}`, inline: true },
                 { name: '\u200B', value: '\u200B', inline: true },
                 { name: '\u200B', value: '\u200B', inline: true },
-                { name: '`[ ⚙️ CORE PROTOCOLS (PASSIVE) ]`', value: innateSuperpowersText },
-                { name: '`[ ⚡ ACTIVE ABILITIES ]`', value: superpowersText }
+                { name: '`[ ⚙️ INNATE SUPERPOWERS ]`', value: innateSuperpowersText },
+                { name: '`[ ⚡ SUPERPOWERS ]`', value: superpowersText }
             );
         } else {
             profileEmbed.setDescription('**Status:** Standby Mode (Alt Account)');
