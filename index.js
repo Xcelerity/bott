@@ -524,13 +524,7 @@ client.on('interactionCreate', async interaction => {
                         { id: slsData.head, allow: [PermissionsBitField.Flags.ViewChannel] },
                     ]
                 });
-                const leaveRow = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`special-leave_biometric-core_${visitorId}_${slsData.head}`)
-                        .setLabel('Leave Biometric Core')
-                        .setStyle(ButtonStyle.Danger)
-                );
-                await biometricCoreChannel.send({ content: `Welcome, ${visitor} and ${interaction.member}. You can leave at any time.`, components: [leaveRow] });
+                await biometricCoreChannel.send({ content: `Welcome, ${visitor} and ${interaction.member}.`});
             }
             await interaction.message.edit({ content: `You have accepted **${visitor.displayName}**'s request. They have entered the Biometric Core.`, components: [] });
             visitorRoleChannel?.send(`✅ Your request to visit St. Lazarus Spire was accepted.`);
@@ -574,13 +568,7 @@ client.on('interactionCreate', async interaction => {
                         { id: bhData.head, allow: [PermissionsBitField.Flags.ViewChannel] },
                     ]
                 });
-                const leaveRow = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`special-leave_netherspire_${visitorId}_${bhData.head}`)
-                        .setLabel('Leave Netherspire')
-                        .setStyle(ButtonStyle.Danger)
-                );
-                await netherspireChannel.send({ content: `Welcome, ${visitor} and ${interaction.member}. You can leave at any time.`, components: [leaveRow] });
+                await netherspireChannel.send({ content: `Welcome, ${visitor} and ${interaction.member}.` });
             }
             await interaction.message.edit({ content: `You have accepted **${visitor.displayName}**'s request. They have been sucked into the Netherspire.`, components: [] });
             visitorRoleChannel?.send(`✅ Your request to visit the Black Hole was accepted.`);
@@ -624,13 +612,7 @@ client.on('interactionCreate', async interaction => {
                         { id: cygnusData.head, allow: [PermissionsBitField.Flags.ViewChannel] },
                     ]
                 });
-                const leaveRow = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`special-leave_consultation-room_${visitorId}_${cygnusData.head}`)
-                        .setLabel('Leave Consultation Room')
-                        .setStyle(ButtonStyle.Danger)
-                );
-                await consultationChannel.send({ content: `Welcome, ${visitor} and ${interaction.member}. You can leave at any time.`, components: [leaveRow] });
+                await consultationChannel.send({ content: `Welcome, ${visitor} and ${interaction.member}.`});
             }
             await interaction.message.edit({ content: `You have accepted **${visitor.displayName}**'s request. Enjoy scamming them inside the Consultation Room.`, components: [] });
             visitorRoleChannel?.send(`✅ Your request to visit the Cygnus Exchange was accepted.`);
@@ -674,13 +656,7 @@ client.on('interactionCreate', async interaction => {
                         { id: laFamigliaData.head, allow: [PermissionsBitField.Flags.ViewChannel] },
                     ]
                 });
-                const leaveRow = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`special-leave_sala-da-pranzo_${visitorId}_${laFamigliaData.head}`)
-                        .setLabel('Leave Sala da Pranzo')
-                        .setStyle(ButtonStyle.Danger)
-                );
-                await salaChannel.send({ content: `Welcome, ${visitor} and ${interaction.member}. You can leave at any time.`, components: [leaveRow] });
+                await salaChannel.send({ content: `Welcome, ${visitor} and ${interaction.member}.` });
             }
             await interaction.message.edit({ content: `You have accepted **${visitor.displayName}**'s request. Feed them nicely in Sala da Pranzo.`, components: [] });
             visitorRoleChannel?.send(`✅ Your request to visit La Famiglia Galattica was accepted.`);
