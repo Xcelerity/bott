@@ -3389,6 +3389,7 @@ client.on('messageCreate', async message => {
                         `\`${PREFIX}set-lore @player "<lore text>"\` - Sets a player's lore.\n` +
                         `\`${PREFIX}set-categories @Player <Cat1> <Cat2>...\` - Sets a player's ability categories.\n` +
                         `\`${PREFIX}set-visits @Player <day|night> <reg|spec|stealth> <count>\` - Sets visit counts.\n` +
+                        `\`${PREFIX}add-visits @Player <d_r> <d_s> <d_st> <n_r> <n_s> <n_st>\` - Adds visits to a player's total.\n` +
                         `\`${PREFIX}setspecialcount @Player <count>\` - Sets special location entry count.\n` +
                         `\`${PREFIX}add-ability @Player <active|passive> <args>\` - Adds an ability to a profile.`
                 },
