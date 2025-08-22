@@ -925,7 +925,7 @@ client.on('messageCreate', async message => {
     const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
 
     const playerCommands = ['profile', 'visit', 'vote', 'preset', 'home', 'movein', 'action', 'visitspecial', 'bal', 'balance', 'daily', 'shop', 'buy', 'inv', 'inventory', 'countday', 'whisper', 'sos'];
-    const adminOnlyCommands = ['create', 'thriving', 'challenger', 'alt', 'close', 'list-ships', 'pc', 'dead', 'night', 'day', 'allowvisits', 'manipulate', 'votereset', 'reset', 'set-role-profile', 'set-visits', 'add-ability', 'public', 'setknocktimer', 'sethome', 'backhome', 'set-categories', 'allpresets', 'addpartner', 'destroy', 'special_to_regular', 'stealth_to_regular', 'visitblock', 'destroydoor', 'revive', 'alive', 'actions', 'sls', 'blackhole', 'cygnus', 'la', 'setspecialcount', 'where', 'gem-give', 'gem-take', 'gem-set', 'shop-add', 'shop-add-role', 'shop-remove', 'item-give', 'item-take', 'giveos', 'teleport', 'set-lore', 'count', 'setwhisperlimit'];
+    const adminOnlyCommands = ['create', 'thriving', 'challenger', 'alt', 'close', 'list-ships', 'pc', 'dead', 'night', 'day', 'allowvisits', 'manipulate', 'votereset', 'reset', 'set-role-profile', 'set-visits', 'add-ability', 'public', 'setknocktimer', 'sethome', 'backhome', 'set-categories', 'allpresets', 'addpartner', 'destroy', 'special_to_regular', 'stealth_to_regular', 'visitblock', 'destroydoor', 'revive', 'alive', 'actions', 'sls', 'blackhole', 'cygnus', 'la', 'setspecialcount', 'where', 'gem-give', 'gem-take', 'gem-set', 'shop-add', 'shop-add-role', 'shop-remove', 'item-give', 'item-take', 'giveos', 'teleport', 'set-lore', 'count', 'setwhisperlimit', 'add-visits'];
 
     if (adminOnlyCommands.includes(command) && !isAdmin) {
         return message.reply('You must be an Administrator to use that command.');
@@ -1530,6 +1530,35 @@ client.on('messageCreate', async message => {
         playerData.profile.visits[timeOfDay][visitType] = count;
         await setDocument('players', targetMember.id, { profile: playerData.profile });
         await message.reply(`✅ Set ${targetMember.displayName}'s **${timeOfDay} ${visitType}** visits to **${count}**.`);
+    }
+    else if (command === 'add-visits' && isAdmin) {
+        const targetMember = message.mentions.members.first();
+        const [dayRegStr, daySpecStr, dayStealthStr, nightRegStr, nightSpecStr, nightStealthStr] = args.slice(1);
+        const dayReg = parseInt(dayRegStr);
+        const daySpec = parseInt(daySpecStr);
+        const dayStealth = parseInt(dayStealthStr);
+        const nightReg = parseInt(nightRegStr);
+        const nightSpec = parseInt(nightSpecStr);
+        const nightStealth = parseInt(nightStealthStr);
+
+        if (!targetMember || isNaN(dayReg) || isNaN(daySpec) || isNaN(dayStealth) || isNaN(nightReg) || isNaN(nightSpec) || isNaN(nightStealth)) {
+            return message.reply(`Syntax: \`${PREFIX}add-visits @player <day_reg> <day_spec> <day_stealth> <night_reg> <night_spec> <night_stealth>\``);
+        }
+
+        const playerData = await getDocument('players', targetMember.id) || createDefaultProfile(targetMember);
+        const profile = playerData.profile;
+
+        profile.visits.day.regular += dayReg;
+        profile.visits.day.special += daySpec;
+        profile.visits.day.stealth += dayStealth;
+        profile.visits.night.regular += nightReg;
+        profile.visits.night.special += nightSpec;
+        profile.visits.night.stealth += nightStealth;
+
+        await setDocument('players', targetMember.id, { profile: profile });
+        await message.reply(`✅ Added visits to **${targetMember.displayName}**:\n` +
+            `Day: +${dayReg} Regular, +${daySpec} Special, +${dayStealth} Stealth\n` +
+            `Night: +${nightReg} Regular, +${nightSpec} Special, +${nightStealth} Stealth`);
     }
     else if (command === 'setspecialcount' && isAdmin) {
         const targetMember = message.mentions.members.first();
@@ -3348,21 +3377,22 @@ client.on('messageCreate', async message => {
                         `\`${PREFIX}verysussybaka\` - **DANGER!** Deletes ALL game channels and roles.`
                 },
                 {
-                    name: '👤 Player & Profile Management `[Admin]`',
-                    value: `\`${PREFIX}thriving @Player1 @Player2...\` - Assigns the 'Thriving' role and a home ship.\n` +
-                        `\`${PREFIX}alt @Player1 @Player2...\` - Assigns the 'Alt' role.\n` +
-                        `\`${PREFIX}challenger @Player1 @Player2...\` - Assigns the 'Challenger' role and a waiting room channel.\n` +
-                        `\`${PREFIX}giveos @Player\` - Grants the Overseer (admin) role to a player.\n` +
-                        `\`${PREFIX}dead @Player\` - Kills a player, revoking roles and moving their channel.\n` +
-                        `\`${PREFIX}alive @Player\` - Revives a dead player, assigning a new home ship.\n` +
-                        `\`${PREFIX}addpartner @Player @Partner\` - Assigns a partner who will follow a player.\n` +
-                        `\`${PREFIX}set-role-profile @Player <Role Name> <Team>\` - Sets a player's role name and team.\n` +
-                        `\`${PREFIX}set-lore @player "<lore text>"\` - Sets a player's lore.\n` +
-                        `\`${PREFIX}set-categories @Player <Cat1> <Cat2>...\` - Sets a player's ability categories.\n` +
-                        `\`${PREFIX}set-visits @Player <day|night> <reg|spec|stealth> <count>\` - Sets visit counts.\n` +
-                        `\`${PREFIX}setspecialcount @Player <count>\` - Sets special location entry count.\n` +
-                        `\`${PREFIX}add-ability @Player <active|passive> <args>\` - Adds an ability to a profile.`
-                },
+                name: '👤 Player & Profile Management `[Admin]`',
+                value: `\`${PREFIX}thriving @Player1 @Player2...\` - Assigns the 'Thriving' role and a home ship.\n` +
+                    `\`${PREFIX}alt @Player1 @Player2...\` - Assigns the 'Alt' role.\n` +
+                    `\`${PREFIX}challenger @Player1 @Player2...\` - Assigns the 'Challenger' role and a waiting room channel.\n` +
+                    `\`${PREFIX}giveos @Player\` - Grants the Overseer (admin) role to a player.\n` +
+                    `\`${PREFIX}dead @Player\` - Kills a player, revoking roles and moving their channel.\n` +
+                    `\`${PREFIX}alive @Player\` - Revives a dead player, assigning a new home ship.\n` +
+                    `\`${PREFIX}addpartner @Player @Partner\` - Assigns a partner who will follow a player.\n` +
+                    `\`${PREFIX}set-role-profile @Player <Role Name> <Team>\` - Sets a player's role name and team.\n` +
+                    `\`${PREFIX}set-lore @player "<lore text>"\` - Sets a player's lore.\n` +
+                    `\`${PREFIX}set-categories @Player <Cat1> <Cat2>...\` - Sets a player's ability categories.\n` +
+                    `\`${PREFIX}set-visits @Player <day|night> <reg|spec|stealth> <count>\` - Sets visit counts.\n` +
+                    `\`${PREFIX}add-visits @Player <d_r> <d_s> <d_st> <n_r> <n_s> <n_st>\` - Adds visits to a player's total.\n` + // <-- THIS LINE IS NEW
+                    `\`${PREFIX}setspecialcount @Player <count>\` - Sets special location entry count.\n` +
+                    `\`${PREFIX}add-ability @Player <active|passive> <args>\` - Adds an ability to a profile.`
+               },
                 {
                     name: '💎 Currency & Items `[Admin]`',
                     value: `\`${PREFIX}gem-give @Player <amount>\` - Gives gems to a player.\n` +
