@@ -3377,22 +3377,21 @@ client.on('messageCreate', async message => {
                         `\`${PREFIX}verysussybaka\` - **DANGER!** Deletes ALL game channels and roles.`
                 },
                 {
-                name: '👤 Player & Profile Management `[Admin]`',
-                value: `\`${PREFIX}thriving @Player1 @Player2...\` - Assigns the 'Thriving' role and a home ship.\n` +
-                    `\`${PREFIX}alt @Player1 @Player2...\` - Assigns the 'Alt' role.\n` +
-                    `\`${PREFIX}challenger @Player1 @Player2...\` - Assigns the 'Challenger' role and a waiting room channel.\n` +
-                    `\`${PREFIX}giveos @Player\` - Grants the Overseer (admin) role to a player.\n` +
-                    `\`${PREFIX}dead @Player\` - Kills a player, revoking roles and moving their channel.\n` +
-                    `\`${PREFIX}alive @Player\` - Revives a dead player, assigning a new home ship.\n` +
-                    `\`${PREFIX}addpartner @Player @Partner\` - Assigns a partner who will follow a player.\n` +
-                    `\`${PREFIX}set-role-profile @Player <Role Name> <Team>\` - Sets a player's role name and team.\n` +
-                    `\`${PREFIX}set-lore @player "<lore text>"\` - Sets a player's lore.\n` +
-                    `\`${PREFIX}set-categories @Player <Cat1> <Cat2>...\` - Sets a player's ability categories.\n` +
-                    `\`${PREFIX}set-visits @Player <day|night> <reg|spec|stealth> <count>\` - Sets visit counts.\n` +
-                    `\`${PREFIX}add-visits @Player <d_r> <d_s> <d_st> <n_r> <n_s> <n_st>\` - Adds visits to a player's total.\n` + // <-- THIS LINE IS NEW
-                    `\`${PREFIX}setspecialcount @Player <count>\` - Sets special location entry count.\n` +
-                    `\`${PREFIX}add-ability @Player <active|passive> <args>\` - Adds an ability to a profile.`
-               },
+                    name: '👤 Player & Profile Management `[Admin]`',
+                    value: `\`${PREFIX}thriving @Player1 @Player2...\` - Assigns the 'Thriving' role and a home ship.\n` +
+                        `\`${PREFIX}alt @Player1 @Player2...\` - Assigns the 'Alt' role.\n` +
+                        `\`${PREFIX}challenger @Player1 @Player2...\` - Assigns the 'Challenger' role and a waiting room channel.\n` +
+                        `\`${PREFIX}giveos @Player\` - Grants the Overseer (admin) role to a player.\n` +
+                        `\`${PREFIX}dead @Player\` - Kills a player, revoking roles and moving their channel.\n` +
+                        `\`${PREFIX}alive @Player\` - Revives a dead player, assigning a new home ship.\n` +
+                        `\`${PREFIX}addpartner @Player @Partner\` - Assigns a partner who will follow a player.\n` +
+                        `\`${PREFIX}set-role-profile @Player <Role Name> <Team>\` - Sets a player's role name and team.\n` +
+                        `\`${PREFIX}set-lore @player "<lore text>"\` - Sets a player's lore.\n` +
+                        `\`${PREFIX}set-categories @Player <Cat1> <Cat2>...\` - Sets a player's ability categories.\n` +
+                        `\`${PREFIX}set-visits @Player <day|night> <reg|spec|stealth> <count>\` - Sets visit counts.\n` +
+                        `\`${PREFIX}setspecialcount @Player <count>\` - Sets special location entry count.\n` +
+                        `\`${PREFIX}add-ability @Player <active|passive> <args>\` - Adds an ability to a profile.`
+                },
                 {
                     name: '💎 Currency & Items `[Admin]`',
                     value: `\`${PREFIX}gem-give @Player <amount>\` - Gives gems to a player.\n` +
