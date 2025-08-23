@@ -925,7 +925,7 @@ client.on('messageCreate', async message => {
     const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
 
     const playerCommands = ['profile', 'visit', 'vote', 'preset', 'home', 'movein', 'action', 'visitspecial', 'bal', 'balance', 'daily', 'shop', 'buy', 'inv', 'inventory', 'countday', 'whisper', 'sos', 'w'];
-    const adminOnlyCommands = ['create', 'thriving', 'challenger', 'alt', 'close', 'list-ships', 'pc', 'dead', 'night', 'day', 'allowvisits', 'manipulate', 'votereset', 'reset', 'set-role-profile', 'set-visits', 'add-ability', 'public', 'setknocktimer', 'sethome', 'backhome', 'set-categories', 'allpresets', 'addpartner', 'destroy', 'special_to_regular', 'stealth_to_regular', 'visitblock', 'destroydoor', 'revive', 'alive', 'actions', 'sls', 'blackhole', 'cygnus', 'la', 'setspecialcount', 'where', 'gem-give', 'gem-take', 'gem-set', 'shop-add', 'shop-add-role', 'shop-remove', 'item-give', 'item-take', 'giveos', 'teleport', 'set-lore', 'count', 'setwhisperlimit', 'add-visits','who'];
+    const adminOnlyCommands = ['create', 'thriving', 'challenger', 'alt', 'close', 'list-ships', 'pc', 'dead', 'night', 'day', 'allowvisits', 'manipulate', 'votereset', 'reset', 'set-role-profile', 'set-visits', 'add-ability', 'public', 'setknocktimer', 'sethome', 'backhome', 'set-categories', 'allpresets', 'addpartner', 'destroy', 'special_to_regular', 'stealth_to_regular', 'visitblock', 'destroydoor', 'revive', 'alive', 'actions', 'sls', 'blackhole', 'cygnus', 'la', 'setspecialcount', 'where', 'gem-give', 'gem-take', 'gem-set', 'shop-add', 'shop-add-role', 'shop-remove', 'item-give', 'item-take', 'giveos', 'teleport', 'set-lore', 'count', 'setwhisperlimit', 'add-visits','who','deleteprofile'];
 
     if (adminOnlyCommands.includes(command) && !isAdmin) {
         return message.reply('You must be an Administrator to use that command.');
@@ -1797,7 +1797,7 @@ client.on('messageCreate', async message => {
     
             profileEmbed.addFields(
                 { name: '\u200B', value: '\u200B' },
-                { name: '`[ 🆔 INTRODUCTION ]`', value: `**Role Name:** ${profile.roleName}\n**Team:** ${profile.team}` },
+                { name: '`[ 🆔 INTRODUCTION ]`', value: `**Role Name:** ${profile.roleName}\n**Team:** ${profile.team}\n**Ability Categories:** ${(profile.abilityCategories && profile.abilityCategories.length > 0) ? profile.abilityCategories.join(', ') : 'None'}` },
                 { name: '`[ 📜 LORE ]`', value: `>>> ${profile.lore || 'Not set.'}` },
                 { name: '`[ ✨ SPECIAL ENTRIES ]`', value: `**Visits Left:** ${profile.specialCount}`, inline: true },
                 { name: '\u200B', value: '\u200B', inline: true },
@@ -1972,6 +1972,45 @@ client.on('messageCreate', async message => {
             await message.channel.send('An error occurred while processing the command.');
         }
     }
+
+    else if (command === 'deleteprofile' && isAdmin) {
+        const targetMember = message.mentions.members.first();
+        if (!targetMember) {
+            return message.reply(`Syntax: \`${PREFIX}deleteprofile @player\``);
+        }
+
+        await message.reply(`🔥 Deleting all profile data for **${targetMember.displayName}**...`);
+
+        try {
+            // Remove roles
+            const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
+            const partnerRole = guild.roles.cache.find(r => r.name === 'Partner');
+            if (thrivingRole) await targetMember.roles.remove(thrivingRole).catch(console.error);
+            if (partnerRole) await targetMember.roles.remove(partnerRole).catch(console.error);
+
+            // Remove player from their current ship
+            await executePlayerMove(targetMember, null, 'loud');
+
+            // Delete player's role channel
+            const playerRoleChannel = await getPlayerRoleChannel(guild, targetMember);
+            if (playerRoleChannel) {
+                await playerRoleChannel.delete('Player profile deleted').catch(console.error);
+            }
+
+            // Delete all associated data from Firestore
+            const collectionsToDeleteFrom = ['players', 'initialAssignments', 'partners', 'presets', 'actionLogs', 'playerSpecialVisits'];
+            const deletionPromises = collectionsToDeleteFrom.map(collectionName =>
+                deleteDocument(collectionName, targetMember.id)
+            );
+            await Promise.all(deletionPromises);
+
+            await message.channel.send(`✅ Successfully deleted all data for **${targetMember.displayName}**.`);
+
+        } catch (error) {
+            console.error('Error in .deleteprofile command:', error);
+            await message.channel.send('An error occurred while deleting the profile. Please check the logs.');
+        }
+    }
     else if (command === 'public' && isAdmin) {
         if (!message.channel.name.startsWith('spaceship-')) {
             return message.reply('This command can only be used inside a spaceship channel.');
@@ -3437,6 +3476,7 @@ client.on('messageCreate', async message => {
                         `\`${PREFIX}giveos @Player\` - Grants the Overseer (admin) role to a player.\n` +
                         `\`${PREFIX}dead @Player\` - Kills a player, revoking roles and moving their channel.\n` +
                         `\`${PREFIX}alive @Player\` - Revives a dead player, assigning a new home ship.\n` +
+                        `\`${PREFIX}deleteprofile @Player\` - Deletes a player's profile and all associated data.\n` +
                         `\`${PREFIX}addpartner @Player @Partner\` - Assigns a partner who will follow a player.\n` +
                         `\`${PREFIX}set-role-profile @Player <Role Name> <Team>\` - Sets a player's role name and team.\n` +
                         `\`${PREFIX}set-lore @player "<lore text>"\` - Sets a player's lore.\n` +
