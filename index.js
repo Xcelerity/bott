@@ -293,58 +293,6 @@ async function resetFullGameState() {
 }
 
 /**
- * NEW helper function to handle the assignment logic, reused for both new and occupied ships.
- * @param {import('discord.js').GuildMember} member - The member to assign.
- * @param {import('discord.js').TextChannel} assignedShip - The channel to assign the member to.
- * @param {import('discord.js').CategoryChannel} roleCategory - The category for role channels.
- */
-async function processPlayerAssignment(member, assignedShip, roleCategory) {
-    const guild = member.guild;
-    const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
-
-    await member.roles.add(thrivingRole);
-
-    const playerDoc = await getDocument('players', member.id);
-    if (!playerDoc) {
-        await setDocument('players', member.id, createDefaultProfile(member));
-    } else {
-        await setDocument('players', member.id, { displayName: member.displayName });
-    }
-
-    // Set initial assignment (home ship)
-    await setDocument('initialAssignments', member.id, { shipId: assignedShip.id });
-
-    // Set current assignment and permissions
-    const currentAssignment = await getDocument('shipAssignments', assignedShip.id);
-    const occupants = new Set(currentAssignment?.occupants || []);
-    occupants.add(member.id);
-    await setDocument('shipAssignments', assignedShip.id, { occupants: Array.from(occupants) });
-    await assignedShip.permissionOverwrites.create(member.id, { ViewChannel: true, SendMessages: true });
-    
-    // Update channel topic
-    const occupantNames = await Promise.all(Array.from(occupants).map(async id => (await guild.members.fetch(id).catch(() => null))?.displayName || 'Unknown'));
-    await assignedShip.setTopic(`Occupied by ${occupantNames.join(', ')}`);
-
-    const welcomeMsg = await assignedShip.send(`👋 Welcome, **${member.displayName}**! This is your home base. Feel comfortable!`);
-    await welcomeMsg.pin().catch(console.error);
-
-    // Create personal role channel if it doesn't exist
-    const channelName = member.displayName.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
-    const playerRoleChannel = await getPlayerRoleChannel(guild, member);
-
-
-    if (!playerRoleChannel) {
-        const newPlayerChannel = await guild.channels.create({
-            name: channelName,
-            type: ChannelType.GuildText,
-            parent: roleCategory.id,
-            permissionOverwrites: [{ id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel] }, { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel] }]
-        });
-        await newPlayerChannel.send(`Welcome, ${member}! You have been assigned to **${assignedShip.name}** in the **${assignedShip.parent.name}** system. Use \`.profile\` here to see your details.`);
-    }
-}
-
-/**
  * NEW helper function to handle the assignment logic, reused for both new and occupied ships.
  * @param {import('discord.js').GuildMember} member - The member to assign.
  * @param {import('discord.js').TextChannel} assignedShip - The channel to assign the member to.
