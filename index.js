@@ -293,6 +293,58 @@ async function resetFullGameState() {
 }
 
 /**
+ * NEW helper function to handle the assignment logic, reused for both new and occupied ships.
+ * @param {import('discord.js').GuildMember} member - The member to assign.
+ * @param {import('discord.js').TextChannel} assignedShip - The channel to assign the member to.
+ * @param {import('discord.js').CategoryChannel} roleCategory - The category for role channels.
+ */
+async function processPlayerAssignment(member, assignedShip, roleCategory) {
+    const guild = member.guild;
+    const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
+
+    await member.roles.add(thrivingRole);
+
+    const playerDoc = await getDocument('players', member.id);
+    if (!playerDoc) {
+        await setDocument('players', member.id, createDefaultProfile(member));
+    } else {
+        await setDocument('players', member.id, { displayName: member.displayName });
+    }
+
+    // Set initial assignment (home ship)
+    await setDocument('initialAssignments', member.id, { shipId: assignedShip.id });
+
+    // Set current assignment and permissions
+    const currentAssignment = await getDocument('shipAssignments', assignedShip.id);
+    const occupants = new Set(currentAssignment?.occupants || []);
+    occupants.add(member.id);
+    await setDocument('shipAssignments', assignedShip.id, { occupants: Array.from(occupants) });
+    await assignedShip.permissionOverwrites.create(member.id, { ViewChannel: true, SendMessages: true });
+    
+    // Update channel topic
+    const occupantNames = await Promise.all(Array.from(occupants).map(async id => (await guild.members.fetch(id).catch(() => null))?.displayName || 'Unknown'));
+    await assignedShip.setTopic(`Occupied by ${occupantNames.join(', ')}`);
+
+    const welcomeMsg = await assignedShip.send(`👋 Welcome, **${member.displayName}**! This is your home base. Feel comfortable!`);
+    await welcomeMsg.pin().catch(console.error);
+
+    // Create personal role channel if it doesn't exist
+    const channelName = member.displayName.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
+    const playerRoleChannel = await getPlayerRoleChannel(guild, member);
+
+
+    if (!playerRoleChannel) {
+        const newPlayerChannel = await guild.channels.create({
+            name: channelName,
+            type: ChannelType.GuildText,
+            parent: roleCategory.id,
+            permissionOverwrites: [{ id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel] }, { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel] }]
+        });
+        await newPlayerChannel.send(`Welcome, ${member}! You have been assigned to **${assignedShip.name}** in the **${assignedShip.parent.name}** system. Use \`.profile\` here to see your details.`);
+    }
+}
+
+/**
  * NEW helper function to handle the assignment logic, reused for both new and occupied ships.
  * @param {import('discord.js').GuildMember} member - The member to assign.
  * @param {import('discord.js').TextChannel} assignedShip - The channel to assign the member to.
@@ -1198,7 +1250,6 @@ client.on('messageCreate', async message => {
                         await category.permissionOverwrites.edit(thrivingRole.id, { ViewChannel: false });
                     }
                 }
-
                 const categoriesToShow = ['DAYTIME', 'PUBLIC CHANNELS', 'PRIVATE CHANNELS', 'TALKING'];
                 for (const catName of categoriesToShow) {
                     const category = guild.channels.cache.find(c => c.name === catName && c.type === ChannelType.GuildCategory);
@@ -1216,64 +1267,48 @@ client.on('messageCreate', async message => {
             }
 
             const availableShips = await getAvailableShips(guild);
-            if (availableShips.length < mentions.size) {
-                return message.reply(`❌ Not enough available ships! Need ${mentions.size}, but only ${availableShips.length} are free.`);
-            }
+            const occupiedShipsSnapshot = await getDocs(collection(db, 'shipAssignments'));
+            const occupiedShips = occupiedShipsSnapshot.docs.map(doc => guild.channels.cache.get(doc.id)).filter(c => c);
+
+            const playersToAssign = [...mentions.values()];
+            let assignedCount = 0;
+
             // Shuffle available ships for randomness
             for (let i = availableShips.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [availableShips[i], availableShips[j]] = [availableShips[j], availableShips[i]];
             }
-
-            const playerChannelCounters = new Map();
-            let assignedCount = 0;
-
-            for (const member of mentions) {
-                await member.roles.add(thrivingRole);
-
-                // Initialize player document if it doesn't exist, or update display name if it does
-                const playerDoc = await getDocument('players', member.id);
-                if (!playerDoc) {
-                    await setDocument('players', member.id, createDefaultProfile(member));
-                } else {
-                    await setDocument('players', member.id, { displayName: member.displayName });
-                }
-
-                const assignedShip = availableShips[assignedCount++];
-                if (!assignedShip) continue; // Should not happen with the check above
-
-                // Set initial assignment (home ship)
-                await setDocument('initialAssignments', member.id, { shipId: assignedShip.id });
-
-                // Set current assignment
-                const currentAssignment = await getDocument('shipAssignments', assignedShip.id);
-                const occupants = new Set(currentAssignment?.occupants || []);
-                occupants.add(member.id);
-                await setDocument('shipAssignments', assignedShip.id, { occupants: Array.from(occupants) });
-
-                await assignedShip.permissionOverwrites.create(member.id, { ViewChannel: true, SendMessages: true });
-
-                const occupantNames = await Promise.all(Array.from(occupants).map(async id => (await guild.members.fetch(id).catch(() => null))?.displayName || 'Unknown'));
-                await assignedShip.setTopic(`Occupied by ${occupantNames.join(', ')}`);
-
-                const welcomeMsg = await assignedShip.send(`👋 Welcome, **${member.displayName}**! This is your home base. Feel comfortable!`);
-                await welcomeMsg.pin().catch(console.error);
-
-                const count = (playerChannelCounters.get(member.id) || 0) + 1;
-                playerChannelCounters.set(member.id, count);
-                const channelName = count === 1 ? member.displayName : `${member.displayName}-${count}`;
-
-                const playerChannel = await guild.channels.create({
-                    name: channelName,
-                    type: ChannelType.GuildText,
-                    parent: roleCategory.id,
-                    permissionOverwrites: [{ id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel] }, { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel] }]
-                });
-
-                await playerChannel.send(`Welcome, ${member}! You have been assigned to **${assignedShip.name}** in the **${assignedShip.parent.name}** system. Use \`.profile\` here to see your details.`);
+            // Shuffle occupied ships for randomness
+            for (let i = occupiedShips.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [occupiedShips[i], occupiedShips[j]] = [occupiedShips[j], occupiedShips[i]];
             }
+            
+            // First, assign to available ships
+            while (availableShips.length > 0 && playersToAssign.length > 0) {
+                const member = playersToAssign.shift();
+                const assignedShip = availableShips.shift();
+                await processPlayerAssignment(member, assignedShip, roleCategory);
+                assignedCount++;
+            }
+
+            // Next, assign remaining players to occupied ships in a round-robin fashion
+            if (playersToAssign.length > 0) {
+                if (occupiedShips.length === 0) {
+                    return message.reply(`❌ All available ships were assigned, but there are no occupied ships to assign the remaining ${playersToAssign.length} player(s) to.`);
+                }
+                let shipIndex = 0;
+                while (playersToAssign.length > 0) {
+                    const member = playersToAssign.shift();
+                    const assignedShip = occupiedShips[shipIndex % occupiedShips.length];
+                    await processPlayerAssignment(member, assignedShip, roleCategory);
+                    assignedCount++;
+                    shipIndex++;
+                }
+            }
+
             const initialAssignmentsSnapshot = await getDocs(collection(db, 'initialAssignments'));
-            await message.channel.send(`✅ Processed ${mentions.size} assignment(s). There are now ${initialAssignmentsSnapshot.size} unique players with home ships.`);
+            await message.channel.send(`✅ Processed ${assignedCount} assignment(s). There are now ${initialAssignmentsSnapshot.size} unique players with home ships.`);
         } catch (error) {
             console.error('An error occurred during .thriving command:', error);
             await message.channel.send('❌ An error occurred. Please check my permissions (`Manage Roles`, `Manage Channels`, `Manage Messages`) and try again.');
