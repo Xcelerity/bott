@@ -2865,19 +2865,33 @@ client.on('messageCreate', async message => {
         }
     }
     else if (command === 'who' && isAdmin) {
-        const targetRole = message.mentions.roles.first();
-        if (!targetRole) {
-            return message.reply(`Syntax: \`${PREFIX}who @role\``);
-        }
+        const targetRole = message.mentions.roles.first();
+        if (!targetRole) {
+            return message.reply(`Syntax: \`${PREFIX}who @role\``);
+        }
 
-        const membersWithRole = targetRole.members;
-        if (membersWithRole.size === 0) {
-            return message.reply(`No players currently have the **${targetRole.name}** role.`);
-        }
+        // Fetch all members to ensure the cache is up-to-date
+        await message.guild.members.fetch();
 
-        const memberMentions = membersWithRole.map(member => member.toString()).join(', ');
-        await message.channel.send(`Players with the **${targetRole.name}** role: ${memberMentions}`);
-    }
+        const membersWithRole = targetRole.members;
+        if (membersWithRole.size === 0) {
+            return message.reply(`No players currently have the **${targetRole.name}** role.`);
+        }
+
+        const memberMentions = membersWithRole.map(member => member.toString()).join(', ');
+        
+        // Send the message, splitting it if it's too long for a single Discord message
+        const response = `Players with the **${targetRole.name}** role: ${memberMentions}`;
+        if (response.length > 2000) {
+            // Split the response into chunks if it exceeds Discord's character limit
+            for (let i = 0; i < response.length; i += 2000) {
+                const chunk = response.substring(i, i + 2000);
+                await message.channel.send(chunk);
+            }
+        } else {
+            await message.channel.send(response);
+        }
+    }
     else if (command === 'w') {
         if (!isPlayer && !isAdmin) {
             return message.reply('You must have the "Thriving" role to use this command.');
