@@ -924,8 +924,8 @@ client.on('messageCreate', async message => {
     const isAlt = message.member.roles.cache.some(r => r.name === 'Alt'); // New role check
     const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
 
-    const playerCommands = ['profile', 'visit', 'vote', 'preset', 'home', 'movein', 'action', 'visitspecial', 'bal', 'balance', 'daily', 'shop', 'buy', 'inv', 'inventory', 'countday', 'whisper', 'sos'];
-    const adminOnlyCommands = ['create', 'thriving', 'challenger', 'alt', 'close', 'list-ships', 'pc', 'dead', 'night', 'day', 'allowvisits', 'manipulate', 'votereset', 'reset', 'set-role-profile', 'set-visits', 'add-ability', 'public', 'setknocktimer', 'sethome', 'backhome', 'set-categories', 'allpresets', 'addpartner', 'destroy', 'special_to_regular', 'stealth_to_regular', 'visitblock', 'destroydoor', 'revive', 'alive', 'actions', 'sls', 'blackhole', 'cygnus', 'la', 'setspecialcount', 'where', 'gem-give', 'gem-take', 'gem-set', 'shop-add', 'shop-add-role', 'shop-remove', 'item-give', 'item-take', 'giveos', 'teleport', 'set-lore', 'count', 'setwhisperlimit', 'add-visits'];
+    const playerCommands = ['profile', 'visit', 'vote', 'preset', 'home', 'movein', 'action', 'visitspecial', 'bal', 'balance', 'daily', 'shop', 'buy', 'inv', 'inventory', 'countday', 'whisper', 'sos', 'w'];
+    const adminOnlyCommands = ['create', 'thriving', 'challenger', 'alt', 'close', 'list-ships', 'pc', 'dead', 'night', 'day', 'allowvisits', 'manipulate', 'votereset', 'reset', 'set-role-profile', 'set-visits', 'add-ability', 'public', 'setknocktimer', 'sethome', 'backhome', 'set-categories', 'allpresets', 'addpartner', 'destroy', 'special_to_regular', 'stealth_to_regular', 'visitblock', 'destroydoor', 'revive', 'alive', 'actions', 'sls', 'blackhole', 'cygnus', 'la', 'setspecialcount', 'where', 'gem-give', 'gem-take', 'gem-set', 'shop-add', 'shop-add-role', 'shop-remove', 'item-give', 'item-take', 'giveos', 'teleport', 'set-lore', 'count', 'setwhisperlimit', 'add-visits','who'];
 
     if (adminOnlyCommands.includes(command) && !isAdmin) {
         return message.reply('You must be an Administrator to use that command.');
@@ -2864,6 +2864,45 @@ client.on('messageCreate', async message => {
             await message.reply('An error occurred while trying to teleport the player.');
         }
     }
+    else if (command === 'who' && isAdmin) {
+        const targetRole = message.mentions.roles.first();
+        if (!targetRole) {
+            return message.reply(`Syntax: \`${PREFIX}who @role\``);
+        }
+
+        const membersWithRole = targetRole.members;
+        if (membersWithRole.size === 0) {
+            return message.reply(`No players currently have the **${targetRole.name}** role.`);
+        }
+
+        const memberMentions = membersWithRole.map(member => member.toString()).join(', ');
+        await message.channel.send(`Players with the **${targetRole.name}** role: ${memberMentions}`);
+    }
+    else if (command === 'w') {
+        if (!isPlayer && !isAdmin) {
+            return message.reply('You must have the "Thriving" role to use this command.');
+        }
+
+        // Check if the command is used in an allowed channel for players
+        if (isPlayer && !isAdmin && !isAllowedInRoleChannel(message, isAdmin, isAlt)) {
+            return;
+        }
+
+        const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
+        if (!thrivingRole) {
+            return message.reply('Could not find the "Thriving" role.');
+        }
+
+        const thrivingMembers = thrivingRole.members.map(member => member.displayName);
+        const thrivingList = thrivingMembers.length > 0 ? thrivingMembers.join(', ') : 'No thriving players found.';
+
+        const thrivingEmbed = new EmbedBuilder()
+            .setColor('Aqua')
+            .setTitle('List of Thriving Players')
+            .setDescription(thrivingList);
+
+        await message.channel.send({ embeds: [thrivingEmbed] });
+    }
     // --- NEW: Gem/Shop Admin Commands ---
     else if (command === 'gem-give' && isAdmin) {
         const targetMember = message.mentions.members.first();
@@ -3443,6 +3482,7 @@ client.on('messageCreate', async message => {
                     name: '🔍 Information & Logs `[Admin]`',
                     value: `\`${PREFIX}where @Player\` - Shows all channels a player is currently in.\n` +
                         `\`${PREFIX}list-ships\` - Lists all unoccupied spaceship channels.\n` +
+                        `\`${PREFIX}who @role\` - Lists all players with a specific role.\n` + 
                         `\`${PREFIX}allpresets\` - Shows all submitted player presets, sorted by priority.\n` +
                         `\`${PREFIX}actions @Player\` - Lists a player's logged actions.\n` +
                         `\`${PREFIX}actions @Player <add|delete> <args>\` - Manages a player's action logs.\n` +
@@ -3465,7 +3505,8 @@ client.on('messageCreate', async message => {
                         `\`${PREFIX}sos\` - Broadcasts your location if you own an 'sos' item.\n` +
                         `\`${PREFIX}visit <regular|special|stealth> <ship-number>\` - Visit another spaceship.\n` +
                         `\`${PREFIX}visitspecial <1-4>\` - Access a special location during the night.\n` +
-                        `\`${PREFIX}vote @Player\` - Cast or change your vote in an active voting channel.`
+                        `\`${PREFIX}vote @Player\` - Cast or change your vote in an active voting channel.\n`+
+                        `\`${PREFIX}w\` - Lists all players with the 'Thriving' role.`
                 },
                 {
                     name: 'ℹ️ General',
