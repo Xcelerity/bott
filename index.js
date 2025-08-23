@@ -3457,119 +3457,244 @@ client.on('messageCreate', async message => {
             await message.channel.send({ embeds: [embed] });
         }
     }
-    else if (command === 'info') {
+        else if (command === 'info') {
+
         const infoEmbed = new EmbedBuilder()
+
             .setColor('#0099ff')
+
             .setTitle('🤖 Baby Yoda Bot - Command Reference')
+
             .setDescription('A detailed guide to all available commands. \n `[Admin]` indicates an Administrator-only command. \n `[Player]` indicates a command for users with the "Thriving" or "Alt" role.')
+
             .addFields(
+
                 {
+
                     name: '🛠️ World & Game Setup `[Admin]`',
+
                     value: `\`${PREFIX}create\` - Builds the entire game world, including channels and roles.\n` +
+
                         `\`${PREFIX}verysussybaka\` - **DANGER!** Deletes ALL game channels and roles.`
+
                 },
+
                 {
+
                     name: '👤 Player & Profile Management `[Admin]`',
+
                     value: `\`${PREFIX}thriving @Player1 @Player2...\` - Assigns the 'Thriving' role and a home ship.\n` +
+
                         `\`${PREFIX}alt @Player1 @Player2...\` - Assigns the 'Alt' role.\n` +
+
                         `\`${PREFIX}challenger @Player1 @Player2...\` - Assigns the 'Challenger' role and a waiting room channel.\n` +
+
                         `\`${PREFIX}giveos @Player\` - Grants the Overseer (admin) role to a player.\n` +
+
                         `\`${PREFIX}dead @Player\` - Kills a player, revoking roles and moving their channel.\n` +
+
                         `\`${PREFIX}alive @Player\` - Revives a dead player, assigning a new home ship.\n` +
-                        `\`${PREFIX}deleteprofile @Player\` - Deletes a player's profile and all associated data.\n` +
-                        `\`${PREFIX}addpartner @Player @Partner\` - Assigns a partner who will follow a player.\n` +
+
+                        `\`${PREFIX}deleteprofile @Player\` - Deletes a player's profile and all associated data.`
+
+                },
+
+                {
+
+                    name: '\u200B',
+
+                    value: `\`${PREFIX}addpartner @Player @Partner\` - Assigns a partner who will follow a player.\n` +
+
                         `\`${PREFIX}set-role-profile @Player <Role Name> <Team>\` - Sets a player's role name and team.\n` +
+
                         `\`${PREFIX}set-lore @player "<lore text>"\` - Sets a player's lore.\n` +
+
                         `\`${PREFIX}set-categories @Player <Cat1> <Cat2>...\` - Sets a player's ability categories.\n` +
+
                         `\`${PREFIX}set-visits @Player <day|night> <reg|spec|stealth> <count>\` - Sets visit counts.\n` +
+
                         `\`${PREFIX}add-visits @Player <d_r> <d_s> <d_st> <n_r> <n_s> <n_st>\` - Adds visits to a player's total.\n` +
+
                         `\`${PREFIX}setspecialcount @Player <count>\` - Sets special location entry count.\n` +
+
                         `\`${PREFIX}add-ability @Player <active|passive> <args>\` - Adds an ability to a profile.`
+
                 },
+
                 {
+
                     name: '💎 Currency & Items `[Admin]`',
+
                     value: `\`${PREFIX}gem-give @Player <amount>\` - Gives gems to a player.\n` +
+
                         `\`${PREFIX}gem-take @Player <amount>\` - Takes gems from a player.\n` +
+
                         `\`${PREFIX}gem-set @Player <amount>\` - Sets a player's gem balance.\n` +
+
                         `\`${PREFIX}item-give @Player <itemName> [amount]\` - Gives an item to a player.\n` +
+
                         `\`${PREFIX}item-take @Player <itemName> [amount]\` - Takes an item from a player.`
+
                 },
+
                 {
+
                     name: '🛒 Shop Management `[Admin]`',
+
                     value: `\`${PREFIX}shop-add <itemName> <price> "<description>"\` - Adds an item to the shop.\n` +
+
                         `\`${PREFIX}shop-add-role <itemName> <price> @role "<description>"\` - Adds a purchasable role to the shop.\n` +
+
                         `\`${PREFIX}shop-remove <itemName>\` - Removes an item from the shop.`
+
                 },
+
                 {
+
                     name: '🚀 Ship & Channel Control `[Admin]`',
+
                     value: `\`${PREFIX}teleport @player #ship\` - Instantly move a player.\n` +
+
                         `\`${PREFIX}sethome @player #ship\` - Change a player's home ship.\n` +
+
                         `\`${PREFIX}backhome\` - Force all players to return home.\n` +
+
                         `\`${PREFIX}close\` - Move a public/private channel to a closed category.\n` +
+
                         `\`${PREFIX}destroy #ship\` - Move a spaceship to the 'destroyed' category.\n` +
+
                         `\`${PREFIX}revive #ship\` - Restore a destroyed spaceship.\n` +
+
                         `\`${PREFIX}destroydoor #ship\` - Make a ship's door permanently open.\n` +
+
                         `\`${PREFIX}public\` - (In a ship) Make it viewable by all players.\n` +
+
                         `\`${PREFIX}pc <public|private> <name> @P1...\` - Create a public/private chat.`
+
                 },
+
                 {
+
                     name: '✨ Location Modifiers `[Admin]`',
+
                     value: `\`${PREFIX}special_to_regular #ship <yes|no>\` - Downgrade special visits.\n` +
+
                         `\`${PREFIX}stealth_to_regular #ship <yes|no>\` - Downgrade stealth visits.\n` +
+
                         `\`${PREFIX}sls <head|maxallow|time> @player\` - Manages St. Lazarus Spire.\n` +
+
                         `\`${PREFIX}blackhole <head|maxallow|time> @player\` - Manages the Black Hole.\n` +
+
                         `\`${PREFIX}cygnus <head|maxallow|time> @player\` - Manages the Cygnus Exchange.\n` +
+
                         `\`${PREFIX}la <head|maxallow|time> @player\` - Manages La Famiglia Galattica.`
+
                 },
+
                 {
+
                     name: '▶️ Game Flow & Control `[Admin]`',
+
                     value: `\`${PREFIX}day\` / \`${PREFIX}night\` - Transitions the game phase and **locks** visits.\n` +
+
                         `\`${PREFIX}allowvisits\` - Unlocks the \`.visit\` command for the current phase.\n` +
+
                         `\`${PREFIX}setknocktimer <minutes>\` - Sets the auto-open timer for knocks.\n` +
+
                         `\`${PREFIX}setwhisperlimit <number>\` - Sets the word limit for whispers.\n` +
+
                         `\`${PREFIX}vote #voting-channel-x\` - Starts a voting session in a channel.\n` +
+
                         `\`${PREFIX}votereset [#channel]\` - Resets one or all voting sessions.\n` +
+
                         `\`${PREFIX}manipulate @Voter [@Target]\` - Forces one player to vote for another (or themselves).\n` +
+
                         `\`${PREFIX}visitblock @Player <yes|no>\` - Blocks or unblocks a player from visiting.`
+
                 },
+
                 {
+
                     name: '🔍 Information & Logs `[Admin]`',
+
                     value: `\`${PREFIX}where @Player\` - Shows all channels a player is currently in.\n` +
+
                         `\`${PREFIX}list-ships\` - Lists all unoccupied spaceship channels.\n` +
-                        `\`${PREFIX}who @role\` - Lists all players with a specific role.\n` + 
+
+                        `\`${PREFIX}who @role\` - Lists all players with a specific role.\n` +
+
                         `\`${PREFIX}allpresets\` - Shows all submitted player presets, sorted by priority.\n` +
+
                         `\`${PREFIX}actions @Player\` - Lists a player's logged actions.\n` +
+
                         `\`${PREFIX}actions @Player <add|delete> <args>\` - Manages a player's action logs.\n` +
+
                         `\`${PREFIX}count\` - Shows message leaderboards for thriving players.\n` +
+
                         `\`${PREFIX}countday\` - Shows message leaderboard for #day-discussion.`
+
                 },
+
                 {
+
                     name: '🚀 Player Actions `[Player]`',
+
                     value: `\`${PREFIX}profile\` - View your profile in your private channel.\n` +
+
                         `\`${PREFIX}bal\` / \`${PREFIX}balance\` - Check your gem balance.\n` +
+
                         `\`${PREFIX}daily\` - Claim your daily 150 gems.\n` +
+
                         `\`${PREFIX}shop\` - View the items available for purchase.\n` +
+
                         `\`${PREFIX}buy <itemName> [amount]\` - Purchase an item from the shop.\n` +
+
                         `\`${PREFIX}inv\` / \`${PREFIX}inventory\` - View your purchased items.\n` +
+
                         `\`${PREFIX}home\` - Return to your assigned home ship.\n` +
-                        `\`${PREFIX}movein #spaceship-channel\` - Request to make your currently visited ship your new home.\n` +
-                        `\`${PREFIX}preset <ability-code> <target>\` - Sets your action (e.g., \`.preset s1 @Player\`).\n` +
-                        `\`${PREFIX}action <ability-code> "<description>"\` - Logs a custom action for admins.\n` +
-                        `\`${PREFIX}whisper <anon|reg> "msg" <target-name>\` - Sends a private message if you own a 'whisper' item.\n`+
-                        `\`${PREFIX}sos\` - Broadcasts your location if you own an 'sos' item.\n` +
-                        `\`${PREFIX}visit <regular|special|stealth> <ship-number>\` - Visit another spaceship.\n` +
-                        `\`${PREFIX}visitspecial <1-4>\` - Access a special location during the night.\n` +
-                        `\`${PREFIX}vote @Player\` - Cast or change your vote in an active voting channel.\n`+
-                        `\`${PREFIX}w\` - Lists all players with the 'Thriving' role.`
+
+                        `\`${PREFIX}movein #spaceship-channel\` - Request to make your currently visited ship your new home.`
+
                 },
+
                 {
+
+                    name: '\u200B',
+
+                    value: `\`${PREFIX}preset <ability-code> <target>\` - Sets your action (e.g., \`.preset s1 @Player\`).\n` +
+
+                        `\`${PREFIX}action <ability-code> "<description>"\` - Logs a custom action for admins.\n` +
+
+                        `\`${PREFIX}whisper <anon|reg> "msg" <target-name>\` - Sends a private message if you own a 'whisper' item.\n`+
+
+                        `\`${PREFIX}sos\` - Broadcasts your location if you own an 'sos' item.\n` +
+
+                        `\`${PREFIX}visit <regular|special|stealth> <ship-number>\` - Visit another spaceship.\n` +
+
+                        `\`${PREFIX}visitspecial <1-4>\` - Access a special location during the night.\n` +
+
+                        `\`${PREFIX}vote @Player\` - Cast or change your vote in an active voting channel.\n`+
+
+                        `\`${PREFIX}w\` - Lists all players with the 'Thriving' role.`
+
+                },
+
+                {
+
                     name: 'ℹ️ General',
+
                     value: `\`${PREFIX}info\` - Displays this help message.`
+
                 }
+
             )
+
             .setFooter({ text: 'May the Force be with you' });
 
+
+
         await message.channel.send({ embeds: [infoEmbed] });
+
     }
 });
 
