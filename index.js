@@ -1127,116 +1127,130 @@ client.on('messageCreate', async message => {
         await message.reply(`✅ Granted **Overseer** permissions to **${targetMember.displayName}**.`);
     }
     else if (command === 'thriving' && isAdmin) {
-        const mentions = [];
-        const mentionRegex = /<@!?(\d+)>/g;
-        let match;
-        while ((match = mentionRegex.exec(message.content)) !== null) {
-            const member = await guild.members.fetch(match[1]).catch(() => null);
-            if (member) {
-                mentions.push(member);
-            }
-        }
+        const mentions = message.mentions.members;
+        if (mentions.size === 0) {
+            return message.reply('Please mention at least one player to make thriving.');
+        }
+        await message.reply(`✨ Processing ${mentions.size} assignment(s)...`);
+        try {
+            let thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
+            if (!thrivingRole) {
+                thrivingRole = await guild.roles.create({ name: 'Thriving', color: 'Aqua', reason: 'Role for active game players' });
+            }
 
-        if (mentions.length === 0) {
-            return message.reply('Please mention at least one player to make thriving.');
-        }
-        await message.reply(`✨ Processing ${mentions.length} assignment(s)...`);
-        try {
-            let thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
-            if (!thrivingRole) {
-                thrivingRole = await guild.roles.create({ name: 'Thriving', color: 'Aqua', reason: 'Role for active game players' });
-            }
+            const gameState = await getGameState();
+            if (!gameState.permissionsConfigured) {
+                const categoriesToHide = ['Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'ROLE CHANNELS'];
+                for (const catName of categoriesToHide) {
+                    const category = guild.channels.cache.find(c => c.name === catName && c.type === ChannelType.GuildCategory);
+                    if (category) {
+                        await category.permissionOverwrites.edit(thrivingRole.id, { ViewChannel: false });
+                    }
+                }
+                const categoriesToShow = ['DAYTIME', 'PUBLIC CHANNELS', 'PRIVATE CHANNELS', 'TALKING'];
+                for (const catName of categoriesToShow) {
+                    const category = guild.channels.cache.find(c => c.name === catName && c.type === ChannelType.GuildCategory);
+                    if (category) {
+                        await category.permissionOverwrites.edit(thrivingRole.id, { ViewChannel: true });
+                    }
+                }
+                await updateGameState({ permissionsConfigured: true });
+                await message.channel.send('🔒 Initial visibility permissions for the "Thriving" role have been set.');
+            }
 
-            const gameState = await getGameState();
-            if (!gameState.permissionsConfigured) {
-                const categoriesToHide = ['Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'ROLE CHANNELS'];
-                for (const catName of categoriesToHide) {
-                    const category = guild.channels.cache.find(c => c.name === catName && c.type === ChannelType.GuildCategory);
-                    if (category) {
-                        await category.permissionOverwrites.edit(thrivingRole.id, { ViewChannel: false });
-                    }
-                }
+            let roleCategory = guild.channels.cache.find(c => c.name === 'ROLE CHANNELS' && c.type === ChannelType.GuildCategory);
+            if (!roleCategory) {
+                roleCategory = await guild.channels.create({ name: 'ROLE CHANNELS', type: ChannelType.GuildCategory });
+            }
 
-                const categoriesToShow = ['DAYTIME', 'PUBLIC CHANNELS', 'PRIVATE CHANNELS', 'TALKING'];
-                for (const catName of categoriesToShow) {
-                    const category = guild.channels.cache.find(c => c.name === catName && c.type === ChannelType.GuildCategory);
-                    if (category) {
-                        await category.permissionOverwrites.edit(thrivingRole.id, { ViewChannel: true });
-                    }
-                }
-                await updateGameState({ permissionsConfigured: true });
-                await message.channel.send('🔒 Initial visibility permissions for the "Thriving" role have been set.');
-            }
+            const availableShips = await getAvailableShips(guild);
+            const occupiedShipsSnapshot = await getDocs(collection(db, 'shipAssignments'));
+            const occupiedShips = occupiedShipsSnapshot.docs.map(doc => guild.channels.cache.get(doc.id)).filter(c => c);
+            
+            const playersToAssign = [...mentions.values()];
+            let assignedCount = 0;
 
-            let roleCategory = guild.channels.cache.find(c => c.name === 'ROLE CHANNELS' && c.type === ChannelType.GuildCategory);
-            if (!roleCategory) {
-                roleCategory = await guild.channels.create({ name: 'ROLE CHANNELS', type: ChannelType.GuildCategory });
-            }
+            // First, assign to available ships
+            for (let i = 0; i < availableShips.length && playersToAssign.length > 0; i++) {
+                const member = playersToAssign.shift();
+                const assignedShip = availableShips[i];
+                await processPlayerAssignment(member, assignedShip, roleCategory);
+                assignedCount++;
+            }
 
-            const availableShips = await getAvailableShips(guild);
-            if (availableShips.length < mentions.length) {
-                return message.reply(`❌ Not enough available ships! Need ${mentions.length}, but only ${availableShips.length} are free.`);
-            }
-            // Shuffle available ships for randomness
-            for (let i = availableShips.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [availableShips[i], availableShips[j]] = [availableShips[j], availableShips[i]];
-            }
+            // Next, assign remaining players to occupied ships in a round-robin fashion
+            if (playersToAssign.length > 0 && occupiedShips.length > 0) {
+                let shipIndex = 0;
+                while (playersToAssign.length > 0) {
+                    const member = playersToAssign.shift();
+                    const assignedShip = occupiedShips[shipIndex % occupiedShips.length];
+                    await processPlayerAssignment(member, assignedShip, roleCategory);
+                    assignedCount++;
+                    shipIndex++;
+                }
+            } else if (playersToAssign.length > 0 && occupiedShips.length === 0) {
+                return message.reply(`❌ No available ships could be found to assign the remaining ${playersToAssign.length} player(s).`);
+            }
 
-            const playerChannelCounters = new Map();
-            let assignedCount = 0;
 
-            for (const member of mentions) {
-                await member.roles.add(thrivingRole);
+            const initialAssignmentsSnapshot = await getDocs(collection(db, 'initialAssignments'));
+            await message.channel.send(`✅ Processed ${assignedCount} assignment(s). There are now ${initialAssignmentsSnapshot.size} unique players with home ships.`);
+        } catch (error) {
+            console.error('An error occurred during .thriving command:', error);
+            await message.channel.send('❌ An error occurred. Please check my permissions (`Manage Roles`, `Manage Channels`, `Manage Messages`) and try again.');
+        }
+    }
 
-                // Initialize player document if it doesn't exist, or update display name if it does
-                const playerDoc = await getDocument('players', member.id);
-                if (!playerDoc) {
-                    await setDocument('players', member.id, createDefaultProfile(member));
-                } else {
-                    await setDocument('players', member.id, { displayName: member.displayName });
-                }
+/**
+ * NEW helper function to handle the assignment logic, reused for both new and occupied ships.
+ * @param {import('discord.js').GuildMember} member - The member to assign.
+ * @param {import('discord.js').TextChannel} assignedShip - The channel to assign the member to.
+ * @param {import('discord.js').CategoryChannel} roleCategory - The category for role channels.
+ */
+async function processPlayerAssignment(member, assignedShip, roleCategory) {
+    const guild = member.guild;
+    const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
 
-                const assignedShip = availableShips[assignedCount++];
-                if (!assignedShip) continue; // Should not happen with the check above
+    await member.roles.add(thrivingRole);
 
-                // Set initial assignment (home ship)
-                await setDocument('initialAssignments', member.id, { shipId: assignedShip.id });
-
-                // Set current assignment
-                const currentAssignment = await getDocument('shipAssignments', assignedShip.id);
-                const occupants = new Set(currentAssignment?.occupants || []);
-                occupants.add(member.id);
-                await setDocument('shipAssignments', assignedShip.id, { occupants: Array.from(occupants) });
-
-                await assignedShip.permissionOverwrites.create(member.id, { ViewChannel: true, SendMessages: true });
-
-                const occupantNames = await Promise.all(Array.from(occupants).map(async id => (await guild.members.fetch(id).catch(() => null))?.displayName || 'Unknown'));
-                await assignedShip.setTopic(`Occupied by ${occupantNames.join(', ')}`);
-
-                const welcomeMsg = await assignedShip.send(`👋 Welcome, **${member.displayName}**! This is your home base. Feel comfortable!`);
-                await welcomeMsg.pin().catch(console.error);
-
-                const count = (playerChannelCounters.get(member.id) || 0) + 1;
-                playerChannelCounters.set(member.id, count);
-                const channelName = count === 1 ? member.displayName : `${member.displayName}-${count}`;
-
-                const playerChannel = await guild.channels.create({
-                    name: channelName,
-                    type: ChannelType.GuildText,
-                    parent: roleCategory.id,
-                    permissionOverwrites: [{ id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel] }, { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel] }]
-                });
-
-                await playerChannel.send(`Welcome, ${member}! You have been assigned to **${assignedShip.name}** in the **${assignedShip.parent.name}** system. Use \`.profile\` here to see your details.`);
-            }
-            const initialAssignmentsSnapshot = await getDocs(collection(db, 'initialAssignments'));
-            await message.channel.send(`✅ Processed ${mentions.length} assignment(s). There are now ${initialAssignmentsSnapshot.size} unique players with home ships.`);
-        } catch (error) {
-            console.error('An error occurred during .thriving command:', error);
-            await message.channel.send('❌ An error occurred. Please check my permissions (`Manage Roles`, `Manage Channels`, `Manage Messages`) and try again.');
-        }
+    const playerDoc = await getDocument('players', member.id);
+    if (!playerDoc) {
+        await setDocument('players', member.id, createDefaultProfile(member));
+    } else {
+        await setDocument('players', member.id, { displayName: member.displayName });
     }
+
+    // Set initial assignment (home ship)
+    await setDocument('initialAssignments', member.id, { shipId: assignedShip.id });
+
+    // Set current assignment and permissions
+    const currentAssignment = await getDocument('shipAssignments', assignedShip.id);
+    const occupants = new Set(currentAssignment?.occupants || []);
+    occupants.add(member.id);
+    await setDocument('shipAssignments', assignedShip.id, { occupants: Array.from(occupants) });
+    await assignedShip.permissionOverwrites.create(member.id, { ViewChannel: true, SendMessages: true });
+    
+    // Update channel topic
+    const occupantNames = await Promise.all(Array.from(occupants).map(async id => (await guild.members.fetch(id).catch(() => null))?.displayName || 'Unknown'));
+    await assignedShip.setTopic(`Occupied by ${occupantNames.join(', ')}`);
+
+    const welcomeMsg = await assignedShip.send(`👋 Welcome, **${member.displayName}**! This is your home base. Feel comfortable!`);
+    await welcomeMsg.pin().catch(console.error);
+
+    // Create personal role channel if it doesn't exist
+    const channelName = member.displayName.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
+    const existingChannel = guild.channels.cache.find(c => c.name.startsWith(channelName));
+
+    if (!existingChannel) {
+        const playerChannel = await guild.channels.create({
+            name: channelName,
+            type: ChannelType.GuildText,
+            parent: roleCategory.id,
+            permissionOverwrites: [{ id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel] }, { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel] }]
+        });
+        await playerChannel.send(`Welcome, ${member}! You have been assigned to **${assignedShip.name}** in the **${assignedShip.parent.name}** system. Use \`.profile\` here to see your details.`);
+    }
+}
     else if (command === 'challenger' && isAdmin) {
         const mentions = message.mentions.members;
         if (mentions.size === 0) {
