@@ -2957,30 +2957,54 @@ client.on('messageCreate', async message => {
         }
     }
     else if (command === 'w') {
-        if (!isPlayer && !isAdmin) {
-            return message.reply('You must have the "Thriving" role to use this command.');
-        }
-
-        // Check if the command is used in an allowed channel for players
-        if (isPlayer && !isAdmin && !isAllowedInRoleChannel(message, isAdmin, isAlt)) {
-            return;
-        }
-
-        const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
-        if (!thrivingRole) {
-            return message.reply('Could not find the "Thriving" role.');
-        }
-
-        const thrivingMembers = thrivingRole.members.map(member => member.displayName);
-        const thrivingList = thrivingMembers.length > 0 ? thrivingMembers.join(', ') : 'No thriving players found.';
-
-        const thrivingEmbed = new EmbedBuilder()
-            .setColor('Aqua')
-            .setTitle('List of Thriving Players')
-            .setDescription(thrivingList);
-
-        await message.channel.send({ embeds: [thrivingEmbed] });
+    const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
+    if (!thrivingRole) {
+        return message.reply('Could not find the "Thriving" role.');
     }
+
+    // Get members, map to display names, and sort alphabetically
+    const thrivingMembers = thrivingRole.members
+        .map(member => member.displayName)
+        .sort((a, b) => a.localeCompare(b));
+
+    // Create a numbered list, joined by newlines
+    const thrivingList = thrivingMembers.length > 0 
+        ? thrivingMembers.map((name, index) => `${index + 1}. ${name}`).join('\n')
+        : 'No thriving players found.';
+
+    const thrivingEmbed = new EmbedBuilder()
+        .setColor('Aqua')
+        .setTitle(`Thriving Players (${thrivingMembers.length})`)
+        .setDescription(thrivingList);
+
+    await message.channel.send({ embeds: [thrivingEmbed] });
+    }
+
+    else if (command === 'd') {
+    const deadRole = guild.roles.cache.find(r => r.name === 'Dead');
+    if (!deadRole) {
+        return message.reply('Could not find the "Dead" role.');
+    }
+
+    // Get members, map to display names, and sort alphabetically
+    const deadMembers = deadRole.members
+        .map(member => member.displayName)
+        .sort((a, b) => a.localeCompare(b));
+
+    // Create a numbered list, joined by newlines
+    const deadList = deadMembers.length > 0 
+        ? deadMembers.map((name, index) => `${index + 1}. ${name}`).join('\n')
+        : 'No dead players found.';
+
+    const deadEmbed = new EmbedBuilder()
+        .setColor('#808080') // A gray color for the dead list
+        .setTitle(`Dead Players (${deadMembers.length})`)
+        .setDescription(deadList);
+
+    await message.channel.send({ embeds: [deadEmbed] });
+  }
+
+  
     // --- NEW: Gem/Shop Admin Commands ---
     else if (command === 'gem-give' && isAdmin) {
         const targetMember = message.mentions.members.first();
