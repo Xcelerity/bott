@@ -2085,25 +2085,29 @@ client.on('messageCreate', async message => {
         await message.reply(`🤫 The word limit for whispers has been set to **${limit}** words.`);
     }
     else if (command === 'night' && isAdmin) {
-        await updateGameState({ isNight: true, visitsAllowed: false });
-        await setDaytimePermissions(guild, false);
+    // Set game state to night and lock visits
+    await updateGameState({ isNight: true, visitsAllowed: false });
+    await setDaytimePermissions(guild, false);
 
-        // Refresh special counts for all players
-        const playersSnapshot = await getDocs(collection(db, 'players'));
-        const batch = writeBatch(db);
-        playersSnapshot.forEach(playerDoc => {
-            const playerData = playerDoc.data();
-            playerData.profile.specialCount = 2;
+    // Refresh special counts for all players
+    const playersSnapshot = await getDocs(collection(db, 'players'));
+    const batch = writeBatch(db);
+    playersSnapshot.forEach(playerDoc => {
+        const playerData = playerDoc.data();
+        if (playerData.profile) {
+            playerData.profile.specialCount = 2; // Resets special visits to the starting amount
             batch.set(playerDoc.ref, { profile: playerData.profile }, { merge: true });
-        });
-        await batch.commit();
+        }
+    });
+    await batch.commit();
 
-        // Clear special visits records
-        await clearCollection('playerSpecialVisits');
-
-        await resetAllVotingSessions(guild);
-        await message.channel.send('🌙 **Night has fallen.** All voting has ended. The thriving players can no longer speak in the daytime channels. Special visit counts have been refreshed.\nVisits are now **LOCKED**. Use `.allowvisits` to enable them.');
-    }
+    // --- FIX: Clears the record of which locations players have visited this phase ---
+    await clearCollection('playerSpecialVisits');
+    
+    // Announce the new game state
+    await resetAllVotingSessions(guild);
+    await message.channel.send('🌙 **Night has fallen.** All voting has ended. The thriving players can no longer speak in the daytime channels. Special visit counts have been refreshed.\nVisits are now **LOCKED**. Use `.allowvisits` to enable them.');
+}
     else if (command === 'day' && isAdmin) {
         await updateGameState({ isNight: false, visitsAllowed: false });
         await setDaytimePermissions(guild, true);
