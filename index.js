@@ -2956,7 +2956,11 @@ client.on('messageCreate', async message => {
             await message.channel.send(response);
         }
     }
+
     else if (command === 'w') {
+    // Force fetch all members to update the cache
+    await message.guild.members.fetch();
+
     const thrivingRole = guild.roles.cache.find(r => r.name === 'Thriving');
     if (!thrivingRole) {
         return message.reply('Could not find the "Thriving" role.');
@@ -2978,8 +2982,8 @@ client.on('messageCreate', async message => {
         .setDescription(thrivingList);
 
     await message.channel.send({ embeds: [thrivingEmbed] });
-    }
-
+}
+    
     else if (command === 'd') {
     const deadRole = guild.roles.cache.find(r => r.name === 'Dead');
     if (!deadRole) {
@@ -3004,7 +3008,7 @@ client.on('messageCreate', async message => {
     await message.channel.send({ embeds: [deadEmbed] });
   }
 
-  
+
     // --- NEW: Gem/Shop Admin Commands ---
     else if (command === 'gem-give' && isAdmin) {
         const targetMember = message.mentions.members.first();
